@@ -189,7 +189,7 @@
       </div>
 
       <!-- ========================================== -->
-      <!-- SCREEN: ADMIN DASHBOARD (ส่วนที่เพิ่มใหม่)     -->
+      <!-- SCREEN: ADMIN DASHBOARD (ส่วนหลังบ้าน)     -->
       <!-- ========================================== -->
       <div id="screen-admin" class="app-screen bg-[#F4F6F9] pb-20">
         <header class="bg-slate-800 text-white px-4 pt-10 pb-4 shadow-sm sticky top-0 z-30 flex items-center justify-between">
@@ -206,24 +206,47 @@
         <main class="flex-1 p-4 space-y-4 overflow-y-auto">
            
            <!-- สรุปข้อมูล -->
-           <div class="grid grid-cols-2 gap-3 mb-2">
-              <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                 <p class="text-[10px] text-slate-500 font-bold mb-1">ร้านค้าทั้งหมด</p>
-                 <h3 class="text-2xl font-black text-slate-800" id="adminCountShops">0</h3>
+           <div class="grid grid-cols-3 gap-2 mb-2">
+              <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+                 <p class="text-[10px] text-slate-500 font-bold mb-1">ร้านค้า</p>
+                 <h3 class="text-xl font-black text-slate-800" id="adminCountShops">0</h3>
               </div>
-              <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                 <p class="text-[10px] text-slate-500 font-bold mb-1">ออเดอร์ในระบบ</p>
-                 <h3 class="text-2xl font-black text-slate-800" id="adminCountOrders">0</h3>
+              <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+                 <p class="text-[10px] text-slate-500 font-bold mb-1">ลูกค้า</p>
+                 <h3 class="text-xl font-black text-slate-800" id="adminCountUsers">0</h3>
+              </div>
+              <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+                 <p class="text-[10px] text-slate-500 font-bold mb-1">ออเดอร์</p>
+                 <h3 class="text-xl font-black text-slate-800" id="adminCountOrders">0</h3>
               </div>
            </div>
 
            <!-- จัดการร้านค้า -->
            <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-              <div class="flex items-center gap-2 border-b border-slate-100 pb-2 mb-3">
-                 <i data-lucide="store" class="w-4 h-4 text-orange-500"></i>
-                 <h2 class="font-bold text-slate-800 text-sm">จัดการร้านค้า (Shops)</h2>
+              <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
+                 <div class="flex items-center gap-2">
+                     <i data-lucide="store" class="w-4 h-4 text-orange-500"></i>
+                     <h2 class="font-bold text-slate-800 text-sm">จัดการร้านค้า (Shops)</h2>
+                 </div>
+                 <button onclick="adminPromptAddShop()" class="text-[10px] bg-orange-50 text-orange-600 px-2 py-1 rounded font-bold hover:bg-orange-100 transition flex items-center gap-1">
+                     <i data-lucide="plus" class="w-3 h-3"></i>เพิ่มร้าน
+                 </button>
               </div>
               <div id="adminShopsList" class="space-y-2 text-sm max-h-48 overflow-y-auto pr-1"></div>
+           </section>
+
+           <!-- จัดการผู้ใช้งาน -->
+           <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
+                 <div class="flex items-center gap-2">
+                     <i data-lucide="users" class="w-4 h-4 text-purple-500"></i>
+                     <h2 class="font-bold text-slate-800 text-sm">จัดการผู้ใช้งาน (ลูกค้า)</h2>
+                 </div>
+                 <button onclick="adminPromptAddUser()" class="text-[10px] bg-purple-50 text-purple-600 px-2 py-1 rounded font-bold hover:bg-purple-100 transition flex items-center gap-1">
+                     <i data-lucide="plus" class="w-3 h-3"></i>เพิ่มลูกค้า
+                 </button>
+              </div>
+              <div id="adminUsersList" class="space-y-2 text-sm max-h-48 overflow-y-auto pr-1"></div>
            </section>
 
            <!-- จัดการออเดอร์ -->
@@ -852,7 +875,7 @@
     let currentSessionUser = null;
     let currentSessionShopId = null;
 
-    const CURRENT_DATA_VERSION = '1.18'; 
+    const CURRENT_DATA_VERSION = '1.19'; 
     if(localStorage.getItem('kt_data_version') !== CURRENT_DATA_VERSION) {
         localStorage.setItem('kt_data_version', CURRENT_DATA_VERSION);
     }
@@ -911,6 +934,14 @@
             const targetId = document.getElementById('reviewTargetShopId').value;
             if(targetId) renderReviewsPage(targetId);
         }
+    });
+
+    // Listener สำหรับ Users Collection
+    db.ref('users').on('value', snapshot => {
+        const data = snapshot.exists() ? snapshot.val() : [];
+        localStorage.setItem('kt_allUsers', JSON.stringify(data));
+        const activeId = document.querySelector('.app-screen.active')?.id;
+        if(activeId === 'screen-admin') renderAdminDashboard();
     });
 
     // --- Audio & Haptic System ---
@@ -1008,6 +1039,16 @@
         db.ref('reviews').set(reviews); 
     }
 
+    // --- Users Logic ---
+    function getAllUsers() {
+        const data = localStorage.getItem('kt_allUsers');
+        return data ? JSON.parse(data) : [];
+    }
+
+    function saveAllUsers(users) {
+        db.ref('users').set(users);
+    }
+
     // --- Profile Settings Logic ---
     let previousScreen = 'screen-home';
     
@@ -1060,6 +1101,14 @@
                  if(n.userName === oldName) { n.userName = newName.trim(); changedNotif = true; }
               });
               if(changedNotif) saveNotifications(allNotifs);
+
+              // Update in Users node
+              let allUsers = getAllUsers();
+              let foundUser = allUsers.find(u => u.name === oldName);
+              if(foundUser) {
+                  foundUser.name = newName.trim();
+                  saveAllUsers(allUsers);
+              }
 
           } else if(currentUserRole === 'merchant') {
               const activeShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
@@ -1369,6 +1418,14 @@
           localStorage.setItem('kt_currentUserName', cleanName);
           document.querySelectorAll('.welcome-name-display').forEach(el => el.innerText = `สวัสดี คุณ${cleanName}`);
           
+          // บันทึกลูกค้าลงระบบ Users ถ้ายังไม่มีชื่อนี้
+          let users = getAllUsers();
+          let existingUser = users.find(u => u.name === cleanName);
+          if(!existingUser) {
+              users.push({ id: 'u_' + Date.now(), name: cleanName, role: 'customer' });
+              saveAllUsers(users);
+          }
+
           startBackgroundSync();
           showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับคุณ ${cleanName}`, 'success', false);
           renderNotifications();
@@ -1527,12 +1584,14 @@
 
     // --- Admin Dashboard Logic ---
     function renderAdminDashboard() {
-        // Update Counts
         const shops = getShopsData();
         const orders = getAllOrders();
+        const users = getAllUsers();
         
+        // อัปเดตตัวเลข
         document.getElementById('adminCountShops').innerText = shops.length;
         document.getElementById('adminCountOrders').innerText = orders.length;
+        document.getElementById('adminCountUsers').innerText = users.length;
 
         // Render Shops List
         let shopHtml = '';
@@ -1544,12 +1603,29 @@
                    <span class="text-[11px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">บูธ ${s.booth}</span>
                 </div>
                 <button onclick="adminDeleteShop('${s.id}')" class="bg-red-50 text-red-600 px-2.5 py-1.5 rounded-md text-[11px] font-bold hover:bg-red-100 active:scale-95 transition flex gap-1 items-center">
-                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>ลบร้าน
+                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>ลบ
                 </button>
             </div>`;
         });
         if(!shopHtml) shopHtml = '<div class="text-xs text-gray-400 text-center py-2">ไม่มีร้านค้าในระบบ</div>';
         document.getElementById('adminShopsList').innerHTML = shopHtml;
+
+        // Render Users List
+        let userHtml = '';
+        users.slice().reverse().forEach(u => {
+            userHtml += `
+            <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                <div>
+                   <span class="font-bold text-slate-700 text-sm">${u.name}</span> 
+                   <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">สถานะ: ลูกค้า</span>
+                </div>
+                <button onclick="adminDeleteUser('${u.id}')" class="bg-red-50 text-red-600 px-2.5 py-1.5 rounded-md text-[11px] font-bold hover:bg-red-100 active:scale-95 transition flex gap-1 items-center">
+                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>ลบ
+                </button>
+            </div>`;
+        });
+        if(!userHtml) userHtml = '<div class="text-xs text-gray-400 text-center py-2">ไม่มีข้อมูลลูกค้าในระบบ</div>';
+        document.getElementById('adminUsersList').innerHTML = userHtml;
 
         // Render Orders List
         let orderHtml = '';
@@ -1563,7 +1639,7 @@
                     <div class="text-[11px] text-slate-500 mt-1">ลค: <span class="font-bold">${o.userName}</span> | ร้าน: ${o.shopName}</div>
                 </div>
                 <button onclick="adminDeleteOrder('${o.id}')" class="bg-red-50 text-red-600 px-2.5 py-1.5 rounded-md text-[11px] font-bold hover:bg-red-100 active:scale-95 transition flex gap-1 items-center">
-                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>ลบออเดอร์
+                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>ลบ
                 </button>
             </div>`;
         });
@@ -1573,32 +1649,64 @@
         lucide.createIcons();
     }
 
+    // ฟังก์ชันสำหรับ Add/Delete จาก Admin
+    function adminPromptAddShop() {
+        const name = prompt("กรุณาพิมพ์ชื่อร้านค้าใหม่ (เช่น ร้านข้าวขาหมู):");
+        if(!name) return;
+        const booth = prompt("กรุณาใส่หมายเลขบูธ (เช่น 08):") || "99";
+        
+        let shops = getShopsData();
+        const newShopId = 's_new_' + Date.now();
+        shops.push({
+            id: newShopId, name: name, desc: 'ร้านค้าเปิดใหม่โดยแอดมิน', booth: booth, category: 'rice', rating: 5.0, reviewCount: 0, prepMins: 5, isPaused: false, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCsTrBmZ0heUy8wTYdx2JHiAJ1UaGNga9mLg3Z5Owxmekvo0H5oL9p7iVcwzFnXz-b42ZGR02leJi-3AAQVSmTGVdmq0sWA4TCfOFUK8okAc4lD-PaobHXi3lJvEyihWiya8R0ljoPNv3EKJBjOtDPgmwmFxX2yTZF3knsrKOrK-4KflK-YBmb3Y1qyPIjOY5OyxEUTmODcZ7N1BxZZFsINMfx_txiqGApnj7TuyqksiNTsd856sI-9', menus: []
+        });
+        saveShopsData(shops);
+        showToast("เพิ่มร้านค้าใหม่สำเร็จ", "success", false);
+    }
+
+    function adminPromptAddUser() {
+        const name = prompt("กรุณาพิมพ์ชื่อลูกค้าที่ต้องการเพิ่ม:");
+        if(!name) return;
+        
+        let users = getAllUsers();
+        users.push({ id: 'u_' + Date.now(), name: name, role: 'customer' });
+        saveAllUsers(users);
+        showToast("เพิ่มข้อมูลลูกค้าสำเร็จ", "success", false);
+    }
+
     function adminDeleteShop(shopId) {
-        if(!confirm('ยืนยันการลบร้านค้านี้ออกจากระบบ? (ออเดอร์ของร้านนี้จะไม่ถูกลบไปด้วย แต่หน้าร้านจะหายไป)')) return;
+        if(!confirm('ยืนยันการลบร้านค้านี้ออกจากระบบ? (ออเดอร์เก่าของร้านนี้จะไม่ถูกลบไปด้วย แต่หน้าร้านจะหายไป)')) return;
         let shops = getShopsData();
         shops = shops.filter(s => s.id !== shopId);
-        saveShopsData(shops); // ส่งขึ้น Firebase
+        saveShopsData(shops); 
         showToast('ลบร้านค้าสำเร็จ', 'success', false);
-        renderAdminDashboard();
+    }
+
+    function adminDeleteUser(userId) {
+        if(!confirm('ยืนยันการลบลูกค้าคนนี้ออกจากระบบ? (ถ้าเขาพิมพ์ล็อกอินชื่อเดิมใหม่ ระบบจะสร้างให้ใหม่)')) return;
+        let users = getAllUsers();
+        users = users.filter(u => u.id !== userId);
+        saveAllUsers(users); 
+        showToast('ลบลูกค้าสำเร็จ', 'success', false);
     }
 
     function adminDeleteOrder(orderId) {
         if(!confirm(`ยืนยันการลบออเดอร์ ${orderId} ใช่หรือไม่?`)) return;
         let orders = getAllOrders();
         orders = orders.filter(o => o.id !== orderId);
-        saveAllOrders(orders); // ส่งขึ้น Firebase
+        saveAllOrders(orders); 
         showToast('ลบออเดอร์สำเร็จ', 'success', false);
-        renderAdminDashboard();
     }
 
     function adminFactoryReset() {
-        if(!confirm('⚠️ คำเตือน: ข้อมูลร้านค้าที่สร้างใหม่ ออเดอร์ และรีวิวทั้งหมดจะถูกลบ และคืนค่ากลับเป็นแอปเริ่มต้น คุณแน่ใจหรือไม่?')) return;
+        if(!confirm('⚠️ คำเตือน: ข้อมูลร้านค้า ออเดอร์ ผู้ใช้ และรีวิวทั้งหมดจะถูกลบกลับเป็นค่าเริ่มต้น คุณแน่ใจหรือไม่?')) return;
         
         // Reset ข้อมูลทั้งหมดบน Firebase กลับเป็น default
         db.ref('shops').set(defaultShopsData);
         db.ref('orders').set([]);
         db.ref('reviews').set([]);
         db.ref('notifications').set([]);
+        db.ref('users').set([]);
         
         localStorage.removeItem('kt_lastOrderNo');
         
@@ -2199,7 +2307,7 @@
                saveShopsData(shops);
 
                const allReviews = getAllReviews();
-               const userName = "ลูกค้าไม่ประสงค์ออกนาม"; 
+               const userName = currentSessionUser || "ลูกค้าไม่ประสงค์ออกนาม"; 
                allReviews.push({
                    shopId: shopId,
                    userName: userName,
