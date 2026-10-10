@@ -69,7 +69,7 @@
       z-index: 9999;
       display: flex;
       flex-direction: column;
-      align-items: center; /* จัดกึ่งกลางด้วย Flexbox แทน */
+      align-items: center;
       gap: 8px;
       pointer-events: none;
     }
@@ -82,7 +82,6 @@
       word-break: break-word;
     }
     
-    /* แก้ไข Animation เอาการเลื่อนแกน X ออก เหลือแค่แกน Y */
     @keyframes slideDownToast { 
       from { transform: translateY(-100%); opacity: 0; } 
       to { transform: translateY(0); opacity: 1; } 
@@ -126,7 +125,7 @@
   <!-- Mobile Device Container -->
   <div class="w-full max-w-[430px] mx-auto min-h-[100dvh] bg-[#f8f9fb] relative flex flex-col overflow-hidden shadow-2xl" id="mainContainer">
 
-    <!-- ย้าย Toast Notification Container เข้ามาอยู่ข้างในกรอบมือถือ -->
+    <!-- Toast Notification Container -->
     <div id="toastContainer"></div>
 
     <div class="flex-1 overflow-y-auto overflow-x-hidden relative" id="app-container">
@@ -165,7 +164,7 @@
                 <input class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-1 focus:ring-[#f36614] outline-none" placeholder="เช่น คุณสมชาย หรือ ร้านก๋วยเตี๋ยวป้าแต๋ว" type="text" id="regName" autocomplete="off"/>
               </div>
               <div class="relative">
-                <label class="block text-xs font-semibold text-gray-700 mb-1.5 ml-0.5" id="loginIdLabel">อีเมล หรือ เบอร์โทรศัพท์</label>
+                <label class="block text-xs font-semibold text-gray-700 mb-1.5 ml-0.5" id="loginIdLabel">อีเมล หรือ เบอร์โทรศัพท์ (ใส่ admin เพื่อเข้าสู่ระบบหลังบ้าน)</label>
                 <input class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-1 focus:ring-[#f36614] outline-none" placeholder="example@email.com" type="text" id="loginId" oninput="handleLoginSearch()" autocomplete="off"/>
                 <input type="hidden" id="selectedMerchantShopId" value=""/>
                 <!-- Autocomplete Dropdown -->
@@ -187,6 +186,67 @@
           <span class="text-gray-500" id="footerPrompt">ยังไม่มีบัญชีใช่ไหม?</span>
           <button class="text-[#f36614] font-semibold hover:underline ml-1" id="footerActionBtn" onclick="toggleAuthMode()" type="button">สร้างบัญชี</button>
         </footer>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN: ADMIN DASHBOARD (ส่วนที่เพิ่มใหม่)     -->
+      <!-- ========================================== -->
+      <div id="screen-admin" class="app-screen bg-[#F4F6F9] pb-20">
+        <header class="bg-slate-800 text-white px-4 pt-10 pb-4 shadow-sm sticky top-0 z-30 flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center"><i data-lucide="shield-alert" class="w-5 h-5"></i></div>
+            <div>
+               <h1 class="font-bold text-base tracking-tight leading-tight">Admin Panel</h1>
+               <p class="text-[10px] text-slate-400">ระบบจัดการฐานข้อมูลหลังบ้าน</p>
+            </div>
+          </div>
+          <button onclick="logout()" class="text-[11px] font-semibold bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg transition border border-slate-600 flex items-center gap-1.5"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> ออกระบบ</button>
+        </header>
+
+        <main class="flex-1 p-4 space-y-4 overflow-y-auto">
+           
+           <!-- สรุปข้อมูล -->
+           <div class="grid grid-cols-2 gap-3 mb-2">
+              <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                 <p class="text-[10px] text-slate-500 font-bold mb-1">ร้านค้าทั้งหมด</p>
+                 <h3 class="text-2xl font-black text-slate-800" id="adminCountShops">0</h3>
+              </div>
+              <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                 <p class="text-[10px] text-slate-500 font-bold mb-1">ออเดอร์ในระบบ</p>
+                 <h3 class="text-2xl font-black text-slate-800" id="adminCountOrders">0</h3>
+              </div>
+           </div>
+
+           <!-- จัดการร้านค้า -->
+           <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+              <div class="flex items-center gap-2 border-b border-slate-100 pb-2 mb-3">
+                 <i data-lucide="store" class="w-4 h-4 text-orange-500"></i>
+                 <h2 class="font-bold text-slate-800 text-sm">จัดการร้านค้า (Shops)</h2>
+              </div>
+              <div id="adminShopsList" class="space-y-2 text-sm max-h-48 overflow-y-auto pr-1"></div>
+           </section>
+
+           <!-- จัดการออเดอร์ -->
+           <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+              <div class="flex items-center gap-2 border-b border-slate-100 pb-2 mb-3">
+                 <i data-lucide="receipt" class="w-4 h-4 text-blue-500"></i>
+                 <h2 class="font-bold text-slate-800 text-sm">รายการออเดอร์ทั้งหมด</h2>
+              </div>
+              <div id="adminOrdersList" class="space-y-2 text-sm max-h-60 overflow-y-auto pr-1"></div>
+           </section>
+           
+           <!-- ล้างข้อมูลระบบ -->
+           <section class="bg-red-50 rounded-2xl p-4 shadow-sm border border-red-200 mt-6">
+              <div class="flex items-center gap-2 mb-2">
+                 <i data-lucide="alert-triangle" class="w-5 h-5 text-red-600"></i>
+                 <h2 class="font-bold text-red-800 text-sm">Danger Zone (พื้นที่อันตราย)</h2>
+              </div>
+              <p class="text-[11px] text-red-600/80 mb-3 leading-tight">การกระทำนี้จะรีเซ็ตระบบกลับไปเป็นค่าเริ่มต้น ลบออเดอร์ รีวิว และร้านค้าที่ผู้ใช้สร้างใหม่ทั้งหมดออกจากฐานข้อมูลทันที ไม่สามารถกู้คืนได้</p>
+              <button onclick="adminFactoryReset()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm active:scale-95 flex items-center justify-center gap-2">
+                 <i data-lucide="refresh-cw" class="w-4 h-4"></i> ล้างข้อมูลระบบทั้งหมด (Factory Reset)
+              </button>
+           </section>
+        </main>
       </div>
 
       <!-- ========================================== -->
@@ -792,12 +852,13 @@
     let currentSessionUser = null;
     let currentSessionShopId = null;
 
-    const CURRENT_DATA_VERSION = '1.17'; 
+    const CURRENT_DATA_VERSION = '1.18'; 
     if(localStorage.getItem('kt_data_version') !== CURRENT_DATA_VERSION) {
         localStorage.setItem('kt_data_version', CURRENT_DATA_VERSION);
     }
 
     // --- FIREBASE SETUP ---
+    // ⚠️ IMPORTANT: เอา Firebase Config ของคุณมาวางทับบล็อกนี้ทั้งหมด
     const firebaseConfig = {
       apiKey: "AIzaSyDd5q4CaG5Mys42tGH4Fm1xchJi2tY2wvw",
       authDomain: "kin-thur-app.firebaseapp.com",
@@ -814,7 +875,7 @@
     }
     const db = firebase.database();
 
-    // --- Firebase Listeners (ดึงข้อมูลเรียลไทม์มาเก็บลงเครื่อง) ---
+    // --- Firebase Listeners ---
     db.ref('shops').on('value', snapshot => {
         if (snapshot.exists()) {
             localStorage.setItem('kt_shopsData', JSON.stringify(snapshot.val()));
@@ -823,6 +884,7 @@
             if(activeId === 'screen-stalls') renderAllStalls();
             if(activeId === 'screen-menu' && currentShopId) renderMenuPageContent();
             if(activeId === 'screen-merchant-inventory') renderMerchantInventory();
+            if(activeId === 'screen-admin') renderAdminDashboard();
         } else {
             db.ref('shops').set(defaultShopsData);
         }
@@ -831,7 +893,8 @@
     db.ref('orders').on('value', snapshot => {
         const data = snapshot.exists() ? snapshot.val() : [];
         localStorage.setItem('kt_allOrders', JSON.stringify(data));
-        // ฟังก์ชัน startBackgroundSync จะจัดการดักจับและขึ้นแจ้งเตือนให้เองอัตโนมัติ
+        const activeId = document.querySelector('.app-screen.active')?.id;
+        if(activeId === 'screen-admin') renderAdminDashboard();
     });
 
     db.ref('notifications').on('value', snapshot => {
@@ -942,7 +1005,7 @@
     }
 
     function saveAllReviews(reviews) {
-        db.ref('reviews').set(reviews); // ส่งขึ้น Firebase
+        db.ref('reviews').set(reviews); 
     }
 
     // --- Profile Settings Logic ---
@@ -1026,7 +1089,7 @@
     }
 
     function saveNotifications(notifs) {
-        db.ref('notifications').set(notifs); // ส่งขึ้น Firebase
+        db.ref('notifications').set(notifs); 
     }
 
     function addNotification(userName, title, message, type) {
@@ -1107,7 +1170,7 @@
         }
     }
 
-    // --- Part 1: Core Backend Logic ---
+    // --- Core Backend Logic ---
     const KinThurLogic = {
       baseSlots: ['11:45 น.', '12:00 น.', '12:15 น.', '12:30 น.', '12:45 น.', '13:00 น.'],
       maxQuotaPerSlot: 10,
@@ -1124,32 +1187,15 @@
         img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDH7QehWbWnDd2bBumFo9sd8qPnkT5jVUTXlhA52J5K-XKhsiaRY5ShktkUlURqB9GZneriXQmxOHbthnfMhYS2CD7gBepeJYCGIqJGJZzQuQeCrLuF8FUJUmubxscY320s-ZZIcIp3nVjuvR1u7YCh_2C4GSLFG35XgokmNFqULcKRJoUa8_tv58tqP4RylmVr4l44jCe03rblRlmGBQndCC7WhXO9V_Tq-iU6mloNs0wLsLc9wAR8',
         menus: [
           { id: 'm1_1', name: 'ก๋วยเตี๋ยวต้มยำหมูสับ', desc: 'หมูสับนุ่มๆ มะนาวแท้', price: 50, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAgvFIlaLkIbwvoXgPpyOJSzC8PUfn-AWL2pUQ1XcM18aeMa1zRxdYWl0B3mo9-j4ek2BXsbmImtm3gGKeBpJOlbE5qYm1PtBqTsfr9_OIG5zxLQijWWZMtXzfLWhvK3OLcNuhj5yAP3vIA2Bx7UOezeEfAZCw6ITe0S3lNfF-MErz1gLSbBTLZAugu_bne2-qeOD98aNDmamkYcHE2wLgfciLXcBdlP07umO9cR5K7kaDEJxdLIXhi', status: 'available' },
-          { id: 'm1_2', name: 'บะหมี่เกี๊ยวหมูแดง', desc: 'เกี๊ยวหมูแน่น หมูแดงอบน้ำผึ้ง', price: 65, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCyDIvTnAy4TCxOX3TV7byXwJv7FzxpVP6NrtvWNX-r5_Y7nY6kmw1jXvrv1-kUntAUVap0ourzM9awf7Q1iumDjJZWRMoQDyc4UGB6s7JD4GAZ6I_3gsToSC0_U4dFw8WwVQ-jQBCcQakulUDlTyi2gbdDbt_d309x34UjLm7rtp9w23VXPnyLa_OcQisSIzj9Z-3HjbERujsJofxwImKQe1iN9EPrVuWlgy6A-jLLQbtMSis7zYfR', status: 'available' },
-          { id: 'm1_3', name: 'เกี๊ยวหมูทอดกรอบ', desc: 'แป้งเกี๊ยวบางกรอบ ไส้หมูเน้นๆ', price: 30, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB_9B2PObfzYbEDA6JrY_NQJQvLe_3k6c0_4bYuYk5FNfU13nHjpP-IkyBVUif2TrxFuvRZ8QIShj3Ap1Qf8kuctxbmPQgIL21_wGEt3JT4OBPDQSiQIyUGV0Pu7R34DSIPf8eqwlmccUpw2VL2K6JWxlv4QFVB0H70zcNzzIFSRnk_0Ms9SllDSlbEDgi32kYp_v5q6uKsfFTG_oteFOPQ2buNKx9_TScIpXYkF9m6_5eWf6ip3PjD', status: 'out' }
+          { id: 'm1_2', name: 'บะหมี่เกี๊ยวหมูแดง', desc: 'เกี๊ยวหมูแน่น หมูแดงอบน้ำผึ้ง', price: 65, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCyDIvTnAy4TCxOX3TV7byXwJv7FzxpVP6NrtvWNX-r5_Y7nY6kmw1jXvrv1-kUntAUVap0ourzM9awf7Q1iumDjJZWRMoQDyc4UGB6s7JD4GAZ6I_3gsToSC0_U4dFw8WwVQ-jQBCcQakulUDlTyi2gbdDbt_d309x34UjLm7rtp9w23VXPnyLa_OcQisSIzj9Z-3HjbERujsJofxwImKQe1iN9EPrVuWlgy6A-jLLQbtMSis7zYfR', status: 'available' }
         ]
       },
       {
-        id: 's2', name: 'ร้านลุงเจริญ ข้าวแกง 10 อย่าง', desc: 'คั่วกลิ้งหมูสับ, แกงส้มปลากะพง ฯลฯ', booth: '02', category: 'rice', rating: 4.6, reviewCount: 85, prepMins: 3, isPaused: false,
+        id: 's2', name: 'ร้านลุงเจริญ ข้าวแกง', desc: 'คั่วกลิ้งหมูสับ, แกงส้มปลากะพง ฯลฯ', booth: '02', category: 'rice', rating: 4.6, reviewCount: 85, prepMins: 3, isPaused: false,
         quickNotes: ['ราดข้าวเลย', 'แยกกับข้าว', 'ขอข้าวเยอะ', 'เผ็ดน้อย'],
         img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCsTrBmZ0heUy8wTYdx2JHiAJ1UaGNga9mLg3Z5Owxmekvo0H5oL9p7iVcwzFnXz-b42ZGR02leJi-3AAQVSmTGVdmq0sWA4TCfOFUK8okAc4lD-PaobHXi3lJvEyihWiya8R0ljoPNv3EKJBjOtDPgmwmFxX2yTZF3knsrKOrK-4KflK-YBmb3Y1qyPIjOY5OyxEUTmODcZ7N1BxZZFsINMfx_txiqGApnj7TuyqksiNTsd856sI-9',
         menus: [
           { id: 'm2_1', name: 'ข้าวราดแกง 1 อย่าง', desc: 'เลือกกับข้าวหน้าตู้ได้เลย', price: 40, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCsTrBmZ0heUy8wTYdx2JHiAJ1UaGNga9mLg3Z5Owxmekvo0H5oL9p7iVcwzFnXz-b42ZGR02leJi-3AAQVSmTGVdmq0sWA4TCfOFUK8okAc4lD-PaobHXi3lJvEyihWiya8R0ljoPNv3EKJBjOtDPgmwmFxX2yTZF3knsrKOrK-4KflK-YBmb3Y1qyPIjOY5OyxEUTmODcZ7N1BxZZFsINMfx_txiqGApnj7TuyqksiNTsd856sI-9', status: 'available' }
-        ]
-      },
-      {
-        id: 's3', name: 'ร้านเจ๊จู ข้าวมันไก่-หมูแดง', desc: 'ข้าวมันไก่ตอนเนื้อนุ่ม, ข้าวหมูแดงหมูกรอบ', booth: '07', category: 'rice', rating: 4.7, reviewCount: 200, prepMins: 8, isPaused: false,
-        quickNotes: ['ไม่เอาหนัง', 'เอาเลือด', 'ขอน้ำจิ้มเยอะๆ', 'เอาเนื้อน่อง'],
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBj1HZgkldU6yfSIV19EPgkvtGXYHlDB30UYGgOEMmUX9_nH0smmLZa05LHBX5kH4yHOBZ56x4dT-RdzB7Oslkbq3TIIm8Vsev82QFKIdFCe_KWD-aiKrTR8296uP-wuEqyXE40wXfHQnKemexBVFI1IYTjnEeroFEmcg3LH2e4nxEianuCGSnW2ZzrxKR1g5BeK0PUu_xduIUFhjr0M8-NZ7OgIo3OMrFKVDrfD4QVungBvdkakiqG',
-        menus: [
-          { id: 'm3_1', name: 'ข้าวมันไก่ต้ม', desc: 'ข้าวมันหอมนุ่ม ไก่ฉ่ำๆ', price: 50, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBj1HZgkldU6yfSIV19EPgkvtGXYHlDB30UYGgOEMmUX9_nH0smmLZa05LHBX5kH4yHOBZ56x4dT-RdzB7Oslkbq3TIIm8Vsev82QFKIdFCe_KWD-aiKrTR8296uP-wuEqyXE40wXfHQnKemexBVFI1IYTjnEeroFEmcg3LH2e4nxEianuCGSnW2ZzrxKR1g5BeK0PUu_xduIUFhjr0M8-NZ7OgIo3OMrFKVDrfD4QVungBvdkakiqG', status: 'available' }
-        ]
-      },
-      {
-        id: 's4', name: 'ร้านพี่กิ๊ก น้ำปั่น & กาแฟสด', desc: 'ชาไทยเย็น กาแฟโบราณ น้ำผลไม้ปั่น', booth: '11', category: 'drink', rating: 5.0, reviewCount: 50, prepMins: 2, isPaused: false,
-        quickNotes: ['หวานน้อย', 'หวานปกติ', 'แยกน้ำแข็ง', 'ไม่ใส่มุก'],
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDksG9bL11u1OOz6LGWwu-CSn3IKhEql1Bm4FLFRohmOB9XDAL2-_j_keclpqks7nHw2t18R1dqV8WyfRRwyUt65Sr965ezsHwfyUQsjGAVFuGeGo4N3NJtZ_PAdv6hZst_odQiJwF8bX9XFRRP6gRtnLgY1JCprMfz7D1ovRAxZw8iMqE9VX2HCcHnjtc5GqeRkx6E9XK744GNqCxzw_Eqp0cKonXhn7ur7RV9rZA0QQEYeyDl_yNT',
-        menus: [
-          { id: 'm4_1', name: 'ชาไทยเย็น', desc: 'ชาซีลอนแท้ หอมมัน', price: 30, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDksG9bL11u1OOz6LGWwu-CSn3IKhEql1Bm4FLFRohmOB9XDAL2-_j_keclpqks7nHw2t18R1dqV8WyfRRwyUt65Sr965ezsHwfyUQsjGAVFuGeGo4N3NJtZ_PAdv6hZst_odQiJwF8bX9XFRRP6gRtnLgY1JCprMfz7D1ovRAxZw8iMqE9VX2HCcHnjtc5GqeRkx6E9XK744GNqCxzw_Eqp0cKonXhn7ur7RV9rZA0QQEYeyDl_yNT', status: 'available' }
         ]
       }
     ];
@@ -1160,7 +1206,7 @@
     }
 
     function saveShopsData(data) {
-        db.ref('shops').set(data); // ส่งขึ้น Firebase
+        db.ref('shops').set(data); 
     }
 
     function getAllOrders() { 
@@ -1169,7 +1215,7 @@
     }
     
     function saveAllOrders(ordersArray) { 
-      db.ref('orders').set(ordersArray); // ส่งขึ้น Firebase
+      db.ref('orders').set(ordersArray); 
     }
 
     function getMyActiveOrders() {
@@ -1206,7 +1252,7 @@
 
     lucide.createIcons();
 
-    // --- Part 2: Login & Flow ---
+    // --- Login & Flow ---
     
     function handleLoginSearch() {
         if(currentUserRole !== 'merchant') return;
@@ -1286,7 +1332,7 @@
         cBtn.className = "flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium bg-white text-[#f36614] tab-active-shadow transition";
         mBtn.className = "flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 transition";
         document.getElementById('regNameLabel').innerText = 'ชื่อผู้ใช้งาน';
-        document.getElementById('loginIdLabel').innerText = 'อีเมล หรือ เบอร์โทรศัพท์';
+        document.getElementById('loginIdLabel').innerText = 'อีเมล หรือ เบอร์โทรศัพท์ (ใส่ admin เพื่อเข้าสู่ระบบหลังบ้าน)';
         document.getElementById('loginId').placeholder = 'example@email.com';
       } else {
         mBtn.className = "flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium bg-white text-[#f36614] tab-active-shadow transition";
@@ -1302,6 +1348,20 @@
       
       if(currentUserRole === 'customer') {
           let rawName = document.getElementById('regName').value || document.getElementById('loginId').value.split('@')[0];
+          const pass = document.getElementById('loginPass').value;
+          
+          // ==============================
+          // เช็คระบบ ADMIN
+          // ==============================
+          if(rawName.toLowerCase() === 'admin' && pass === '123456') {
+              currentSessionUser = 'Admin';
+              currentUserRole = 'admin'; // เปลี่ยน Role ชั่วคราว
+              document.getElementById('loginPass').value = '';
+              showToast('เข้าสู่ระบบ Admin สำเร็จ', 'success', false);
+              showScreen('screen-admin');
+              return;
+          }
+
           let cleanName = rawName.replace(/^คุณ/g, '').trim();
           if(!cleanName) cleanName = 'ลูกค้า';
           
@@ -1406,44 +1466,7 @@
       showToast('ออกจากระบบแล้ว', 'info', false);
     }
 
-    // Skeleton Simulation
-    function showSkeleton(containerId, isCard = true) {
-        const container = document.getElementById(containerId);
-        if(!container) return;
-        
-        let html = '';
-        if(isCard) {
-            for(let i=0; i<3; i++) {
-                html += `
-                <div class="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm flex items-center gap-3">
-                  <div class="w-16 h-16 rounded-xl skeleton shrink-0"></div>
-                  <div class="space-y-2 flex-1">
-                    <div class="h-4 w-3/4 skeleton rounded"></div>
-                    <div class="h-3 w-1/2 skeleton rounded"></div>
-                    <div class="h-3 w-1/4 skeleton rounded mt-2"></div>
-                  </div>
-                </div>`;
-            }
-        } else {
-           html = `
-            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 relative">
-               <div class="flex justify-between items-start">
-                  <div class="space-y-2 flex-1"><div class="h-3 w-1/3 skeleton rounded"></div><div class="h-4 w-2/3 skeleton rounded"></div></div>
-                  <div class="w-10 h-10 rounded-full skeleton shrink-0 ml-2"></div>
-               </div>
-            </div>
-            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 h-20 skeleton mt-3"></div>
-            <div class="space-y-3 mt-3">
-               <div class="h-4 w-1/4 skeleton rounded mb-2"></div>
-               <div class="h-24 w-full skeleton rounded-2xl"></div>
-               <div class="h-24 w-full skeleton rounded-2xl"></div>
-            </div>
-           `;
-        }
-        container.innerHTML = html;
-    }
-
-    // Routing
+    // --- Routing ---
     function showScreen(screenId) {
       document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
       const activeScreen = document.getElementById(screenId);
@@ -1467,27 +1490,19 @@
         updateNavState(merchantNav, screenId, 'text-[#FF5722]');
       }
 
-      if(screenId === 'screen-home') {
-          showSkeleton('homeShopList', true);
-          setTimeout(() => renderHomeShops(), 600);
-      }
-      if(screenId === 'screen-stalls') {
-          showSkeleton('allStallsList', true);
-          setTimeout(() => renderAllStalls(), 600);
-      }
-      if(screenId === 'screen-menu' && currentShopId) { 
-          const container = document.getElementById('menuMainContent');
-          if(!container.innerHTML.includes('menuShopName')) {
-             showSkeleton('menuMainContent', false); 
-             setTimeout(() => renderMenuPageContent(), 500);
-          }
-      }
-
+      // Re-renders based on screen
+      if(screenId === 'screen-home') setTimeout(() => renderHomeShops(), 200);
+      if(screenId === 'screen-stalls') setTimeout(() => renderAllStalls(), 200);
+      if(screenId === 'screen-menu' && currentShopId) renderMenuPageContent();
       if(screenId === 'screen-history') renderHistory();
       if(screenId === 'screen-queue') { lastQueueState = null; renderActiveQueue(); }
       if(screenId === 'screen-merchant-kds') { lastKdsState = null; renderKDS(); }
       if(screenId === 'screen-merchant-inventory') renderMerchantInventory();
       if(screenId === 'screen-merchant-dashboard') renderDashboard();
+      
+      // ADMIN
+      if(screenId === 'screen-admin') renderAdminDashboard();
+      
       lucide.createIcons();
     }
 
@@ -1496,7 +1511,7 @@
         btn.className = "nav-btn flex flex-col items-center gap-0.5 text-gray-400 transition hover:text-gray-600";
         if (btn.dataset.target === targetScreen) {
           btn.className = `nav-btn flex flex-col items-center gap-0.5 ${activeColorClass} font-bold transition`;
-          const icon = btn.querySelector('svg'); // Lucide change tags
+          const icon = btn.querySelector('svg'); 
           if(icon) icon.classList.add('fill-current');
         } else {
           const icon = btn.querySelector('svg');
@@ -1510,6 +1525,89 @@
         else showScreen('screen-home');
     }
 
+    // --- Admin Dashboard Logic ---
+    function renderAdminDashboard() {
+        // Update Counts
+        const shops = getShopsData();
+        const orders = getAllOrders();
+        
+        document.getElementById('adminCountShops').innerText = shops.length;
+        document.getElementById('adminCountOrders').innerText = orders.length;
+
+        // Render Shops List
+        let shopHtml = '';
+        shops.forEach(s => {
+            shopHtml += `
+            <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                <div>
+                   <span class="font-bold text-slate-700 text-sm">${s.name}</span> 
+                   <span class="text-[11px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">บูธ ${s.booth}</span>
+                </div>
+                <button onclick="adminDeleteShop('${s.id}')" class="bg-red-50 text-red-600 px-2.5 py-1.5 rounded-md text-[11px] font-bold hover:bg-red-100 active:scale-95 transition flex gap-1 items-center">
+                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>ลบร้าน
+                </button>
+            </div>`;
+        });
+        if(!shopHtml) shopHtml = '<div class="text-xs text-gray-400 text-center py-2">ไม่มีร้านค้าในระบบ</div>';
+        document.getElementById('adminShopsList').innerHTML = shopHtml;
+
+        // Render Orders List
+        let orderHtml = '';
+        orders.slice().reverse().forEach(o => {
+            orderHtml += `
+            <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                <div>
+                    <div class="font-bold text-slate-700 text-sm flex items-center gap-1.5">
+                       ${o.id} <span class="bg-blue-100 text-blue-700 text-[9px] px-1.5 py-0.5 rounded font-black">${o.status}</span>
+                    </div>
+                    <div class="text-[11px] text-slate-500 mt-1">ลค: <span class="font-bold">${o.userName}</span> | ร้าน: ${o.shopName}</div>
+                </div>
+                <button onclick="adminDeleteOrder('${o.id}')" class="bg-red-50 text-red-600 px-2.5 py-1.5 rounded-md text-[11px] font-bold hover:bg-red-100 active:scale-95 transition flex gap-1 items-center">
+                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>ลบออเดอร์
+                </button>
+            </div>`;
+        });
+        if(!orderHtml) orderHtml = '<div class="text-xs text-gray-400 text-center py-2">ไม่มีออเดอร์ในระบบ</div>';
+        document.getElementById('adminOrdersList').innerHTML = orderHtml;
+        
+        lucide.createIcons();
+    }
+
+    function adminDeleteShop(shopId) {
+        if(!confirm('ยืนยันการลบร้านค้านี้ออกจากระบบ? (ออเดอร์ของร้านนี้จะไม่ถูกลบไปด้วย แต่หน้าร้านจะหายไป)')) return;
+        let shops = getShopsData();
+        shops = shops.filter(s => s.id !== shopId);
+        saveShopsData(shops); // ส่งขึ้น Firebase
+        showToast('ลบร้านค้าสำเร็จ', 'success', false);
+        renderAdminDashboard();
+    }
+
+    function adminDeleteOrder(orderId) {
+        if(!confirm(`ยืนยันการลบออเดอร์ ${orderId} ใช่หรือไม่?`)) return;
+        let orders = getAllOrders();
+        orders = orders.filter(o => o.id !== orderId);
+        saveAllOrders(orders); // ส่งขึ้น Firebase
+        showToast('ลบออเดอร์สำเร็จ', 'success', false);
+        renderAdminDashboard();
+    }
+
+    function adminFactoryReset() {
+        if(!confirm('⚠️ คำเตือน: ข้อมูลร้านค้าที่สร้างใหม่ ออเดอร์ และรีวิวทั้งหมดจะถูกลบ และคืนค่ากลับเป็นแอปเริ่มต้น คุณแน่ใจหรือไม่?')) return;
+        
+        // Reset ข้อมูลทั้งหมดบน Firebase กลับเป็น default
+        db.ref('shops').set(defaultShopsData);
+        db.ref('orders').set([]);
+        db.ref('reviews').set([]);
+        db.ref('notifications').set([]);
+        
+        localStorage.removeItem('kt_lastOrderNo');
+        
+        showToast('รีเซ็ตระบบเรียบร้อยแล้ว (กำลังโหลดข้อมูลใหม่...)', 'success', false);
+        setTimeout(() => {
+           renderAdminDashboard();
+        }, 1500);
+    }
+
     // Filter & Search
     function openFilterModal() { document.getElementById('filterModal').classList.remove('hidden'); }
     function closeFilterModal(e) { document.getElementById('filterModal').classList.add('hidden'); }
@@ -1520,8 +1618,7 @@
       else document.getElementById('filterLabelText').innerText = 'จัดเรียง: ร้านแนะนำ';
       
       closeFilterModal();
-      showSkeleton('homeShopList', true);
-      setTimeout(() => renderHomeShops(), 400);
+      renderHomeShops();
     }
     
     function filterCategory(cat, btnElement) {
@@ -1538,8 +1635,7 @@
       const svg = btnElement.querySelector('svg');
       if(svg && svg.classList.contains('lucide-heart')) svg.classList.replace('text-red-500', 'text-white');
 
-      showSkeleton('homeShopList', true);
-      setTimeout(() => renderHomeShops(), 400);
+      renderHomeShops();
     }
 
     function handleSearch(val) { renderHomeShops(val); }
@@ -2071,7 +2167,6 @@
     function setReviewRating(stars) {
        document.getElementById('reviewCurrentStars').value = stars;
        const container = document.getElementById('starRatingContainer');
-       // เปลี่ยนจากการหาแท็ก 'i' เป็น 'svg' เพราะ Lucide แปลง <i> เป็น <svg> ไปแล้ว
        const icons = container.querySelectorAll('svg');
        icons.forEach((icon, index) => {
            if(index < stars) {
@@ -2103,9 +2198,8 @@
                shops[shopIndex].reviewCount = currentCount + 1;
                saveShopsData(shops);
 
-               // Save Review to DB
                const allReviews = getAllReviews();
-               const userName = "ลูกค้าไม่ประสงค์ออกนาม"; // Anonymous by default as requested
+               const userName = "ลูกค้าไม่ประสงค์ออกนาม"; 
                allReviews.push({
                    shopId: shopId,
                    userName: userName,
@@ -2122,7 +2216,7 @@
        }
     }
 
-    // --- 6. BACKGROUND SYNC & REAL-TIME NOTIFICATIONS ---
+    // --- BACKGROUND SYNC & REAL-TIME NOTIFICATIONS ---
     let myLastKnownOrdersState = ""; 
     let merchantLastKnownOrdersState = "";
 
@@ -2132,7 +2226,7 @@
        if(currentUserRole === 'customer') {
            const initialOrders = getMyActiveOrders();
            myLastKnownOrdersState = initialOrders.map(o => o.id + o.status).join('|');
-       } else {
+       } else if(currentUserRole === 'merchant') {
            const initialOrders = getActiveOrdersForMerchant();
            merchantLastKnownOrdersState = initialOrders.map(o => o.id + o.status).join('|');
        }
@@ -2178,7 +2272,7 @@
                  const keyword = document.querySelector('input[placeholder="ค้นหาร้านอาหารหรือเมนู..."]')?.value || '';
                  if(!keyword && currentShopId) renderTimeSlots(currentShopId);
              }
-          } else { // Merchant
+          } else if(currentUserRole === 'merchant') {
              const activeOrds = getActiveOrdersForMerchant();
              const currentState = activeOrds.map(o => o.id + o.status).join('|');
              
@@ -2333,7 +2427,6 @@
       container.innerHTML = html; lucide.createIcons();
     }
 
-    // Merchant Shop Pause Logic
     function toggleShopPauseStatus(checkbox) {
        const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
        const shops = getShopsData();
@@ -2353,7 +2446,7 @@
        else banner.classList.add('hidden');
     }
 
-    // --- 7. MERCHANT KDS LOGIC (With Drag & Drop) ---
+    // --- MERCHANT KDS LOGIC (With Drag & Drop) ---
     let lastKdsState = null;
     function renderKDS() {
       const activeOrds = getActiveOrdersForMerchant();
@@ -2405,7 +2498,6 @@
                 noteHtml = `<div class="mt-2 mb-1 text-[11px] text-red-600 bg-red-50 p-2 rounded border border-red-100 font-medium"><span class="font-bold">📝 หมายเหตุ:</span> ${o.specialNote}</div>`;
              }
 
-             // Added draggable attributes
              html += `
               <article class="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 mb-3 kds-card cursor-grab active:cursor-grabbing transition-transform" draggable="true" ondragstart="handleDragStart(event, '${o.id}', ${index})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, ${index})" ondragend="handleDragEnd(event)">
                 <div class="flex justify-between items-start mb-3 pointer-events-none">
@@ -2425,7 +2517,6 @@
       }
     }
 
-    // Drag and Drop implementation for KDS
     let draggedOrderId = null;
     let draggedOriginalIndex = null;
 
@@ -2437,7 +2528,7 @@
     }
 
     function handleDragOver(e) {
-        e.preventDefault(); // Necessary to allow dropping
+        e.preventDefault(); 
         e.dataTransfer.dropEffect = 'move';
     }
 
@@ -2449,7 +2540,6 @@
         let allOrders = getAllOrders();
         const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
         
-        // Find indices in the MAIN array (not just the filtered active array)
         let activeIndicesInMain = [];
         allOrders.forEach((o, i) => {
             if(o.shopId === activeMerchantShopId && o.status !== 'Completed' && o.status !== 'Cancelled') {
@@ -2460,13 +2550,12 @@
         const fromMainIdx = activeIndicesInMain[draggedOriginalIndex].mainIdx;
         const toMainIdx = activeIndicesInMain[targetIndex].mainIdx;
 
-        // Swap in main array
         const temp = allOrders[fromMainIdx];
         allOrders.splice(fromMainIdx, 1);
         allOrders.splice(toMainIdx, 0, temp);
 
         saveAllOrders(allOrders);
-        lastKdsState = null; // force re-render
+        lastKdsState = null; 
         renderKDS();
         vibrateDevice(50);
     }
@@ -2514,7 +2603,7 @@
       } 
     }
 
-    // --- 8. MERCHANT INVENTORY (CRUD) ---
+    // --- MERCHANT INVENTORY (CRUD) ---
     function renderMerchantInventory() {
        const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
        const shops = getShopsData();
@@ -2635,7 +2724,7 @@
         renderMerchantInventory();
     }
 
-    // --- 9. MERCHANT DASHBOARD ---
+    // --- MERCHANT DASHBOARD ---
     function renderDashboard() {
       const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
       const completedOrders = getAllOrders().filter(o => o.status === 'Completed' && o.shopId === activeMerchantShopId);
@@ -2645,7 +2734,6 @@
       document.getElementById('dashSalesTotal').innerText = `฿${sTotal}`;
       document.getElementById('dashSalesCount').innerText = sCount;
 
-      // Advanced: Best Sellers Logic
       let itemCounts = {};
       completedOrders.forEach(o => {
           if(o.rawItems) {
@@ -2675,12 +2763,10 @@
           bestSellersDiv.innerHTML = html;
       }
 
-      // Advanced: Peak Hours Chart (Simulated distribution based on completed count)
       const chartDiv = document.getElementById('dashPeakChart');
       if(sCount === 0) {
          chartDiv.innerHTML = `<div class="w-full text-center text-gray-400 text-xs self-center">ยังไม่มีข้อมูลเพียงพอ</div>`;
       } else {
-         // Fake distribution for visual
          const h11 = Math.floor(sCount * 0.2);
          const h12 = Math.floor(sCount * 0.5);
          const h13 = sCount - h11 - h12;
@@ -2711,7 +2797,7 @@
         recentContainer.innerHTML = `<div class="text-center text-gray-400 py-4 text-xs">ยังไม่มียอดขายในวันนี้</div>`;
       } else {
         let html = '';
-        completedOrders.slice().reverse().slice(0,5).forEach(o => { // Show last 5
+        completedOrders.slice().reverse().slice(0,5).forEach(o => { 
             html += `
               <div class="flex justify-between items-center text-xs border-b border-gray-50 pb-3 mb-3 last:border-0 last:mb-0 last:pb-0">
                 <div class="flex items-center gap-2">
