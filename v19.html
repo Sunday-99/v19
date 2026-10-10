@@ -1,0 +1,2746 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Kin-Thur (กินเถอะ) - Fast Lane App</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Firebase SDK (Compat Version) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+  <!-- Tailwind Configuration -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { orange: '#f36614', statusGreen: '#1b9b65' }
+          },
+          fontFamily: { sans: ['Prompt', 'Sarabun', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Prompt', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      background-color: #e5e9f0;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    /* Screen Display Logic */
+    .app-screen { display: none; width: 100%; height: 100%; flex-direction: column; position: absolute; inset: 0; background-color: #f8f9fb; animation: fadeIn 0.2s ease-out; }
+    .app-screen.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideDown { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+    .modal-content { animation: slideUp 0.3s ease-out; }
+
+    /* Skeleton Loading */
+    .skeleton { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; border-radius: 0.5rem; }
+
+    /* Custom Toast Notification */
+    #toastContainer {
+      position: absolute;
+      top: 20px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* จัดกึ่งกลางด้วย Flexbox แทน */
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      background: white; border-radius: 12px; padding: 12px 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500;
+      width: 90%; max-width: 380px;
+      animation: slideDownToast 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      pointer-events: auto;
+      word-break: break-word;
+    }
+    
+    /* แก้ไข Animation เอาการเลื่อนแกน X ออก เหลือแค่แกน Y */
+    @keyframes slideDownToast { 
+      from { transform: translateY(-100%); opacity: 0; } 
+      to { transform: translateY(0); opacity: 1; } 
+    }
+
+    .toast.success { border-left: 4px solid #10b981; }
+    .toast.error { border-left: 4px solid #ef4444; }
+    .toast.info { border-left: 4px solid #3b82f6; }
+    .toast.warning { border-left: 4px solid #f59e0b; }
+    .toast.new-order { border-left: 4px solid #f36614; background: #fffaf5; }
+    .toast.fade-out { opacity: 0; transform: translateY(-20px) scale(0.9); transition: all 0.3s ease-in; }
+    
+    /* Common UI Utilities */
+    .no-scrollbar::-webkit-scrollbar, ::-webkit-scrollbar { display: none; }
+    .no-scrollbar, * { -ms-overflow-style: none; scrollbar-width: none; }
+    select { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+
+    /* Custom Styling */
+    .header-curve { clip-path: polygon(0 0, 100% 0, 100% 88%, 0 100%); }
+    .tab-active-shadow { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); }
+    .dashed-upload { border: 1.5px dashed #fbd5b5; transition: all 0.3s; }
+    .ticket-cutout-left { position: absolute; left: -12px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; background-color: #f8f9fc; border-radius: 50%; }
+    .ticket-cutout-right { position: absolute; right: -12px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; background-color: #f8f9fc; border-radius: 50%; }
+
+    /* iOS Toggle Switch */
+    .toggle-checkbox:checked { right: 2px; left: auto; }
+    .toggle-checkbox:not(:checked) { left: 2px; }
+
+    /* Autocomplete for Login */
+    .login-autocomplete-list { position: absolute; z-index: 50; top: 100%; left: 0; right: 0; background: white; border: 1px solid #e2e8f0; border-radius: 0.75rem; margin-top: 4px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-height: 150px; overflow-y: auto; }
+    .login-autocomplete-item { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px;}
+    .login-autocomplete-item:hover { background-color: #f8fafc; }
+    .login-autocomplete-item:last-child { border-bottom: none; }
+    
+    /* Drag & Drop KDS */
+    .kds-card.dragging { opacity: 0.5; transform: scale(0.98); }
+  </style>
+</head>
+<body class="text-slate-800">
+
+  <!-- Mobile Device Container -->
+  <div class="w-full max-w-[430px] mx-auto min-h-[100dvh] bg-[#f8f9fb] relative flex flex-col overflow-hidden shadow-2xl" id="mainContainer">
+
+    <!-- ย้าย Toast Notification Container เข้ามาอยู่ข้างในกรอบมือถือ -->
+    <div id="toastContainer"></div>
+
+    <div class="flex-1 overflow-y-auto overflow-x-hidden relative" id="app-container">
+
+      <!-- ========================================== -->
+      <!-- SCREEN 1: LOGIN                            -->
+      <!-- ========================================== -->
+      <div id="screen-login" class="app-screen active min-h-screen bg-white justify-between pb-6">
+        <div>
+          <header class="bg-[#f36614] text-white pt-10 pb-14 px-6 text-center header-curve relative select-none">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 shadow-inner mb-3">
+              <svg class="w-8 h-8 text-white drop-shadow-sm" fill="currentColor" viewBox="0 0 24 24"><path d="M10 2.5a.75.75 0 0 0-1.5 0v3.25h-.5A1.25 1.25 0 0 0 6.75 7v2.25a2.5 2.5 0 0 0 2.25 2.47V21a.75.75 0 0 0 1.5 0v-9.28A2.5 2.5 0 0 0 12.75 9.25V7a1.25 1.25 0 0 0-1.25-1.25h-.5V2.5a.75.75 0 0 0-1 0zm-2 4.5V7a.25.25 0 0 0 .25.25h.5V7a.75.75 0 0 0-1.5 0v-.25zm3.5 0V7a.75.75 0 0 0-1.5 0v.25h.5A.25.25 0 0 0 11.5 7v-.25z"></path><path d="M16 2.5c-1.8 0-3 1.8-3 4.25 0 1.98.98 3.55 2.25 3.93V21a.75.75 0 0 0 1.5 0V10.68c1.27-.38 2.25-1.95 2.25-3.93 0-2.45-1.2-4.25-3-4.25z"></path></svg>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-white mb-0.5">Kin-Thur</h1>
+            <p class="text-sm font-light text-white/90">ระบบสั่งอาหารล่วงหน้า</p>
+          </header>
+
+          <div class="px-7 pt-4 pb-6">
+            <div class="text-center mb-6">
+              <h2 class="text-xl font-bold text-gray-800" id="mainHeading">ยินดีต้อนรับกลับมา</h2>
+              <p class="text-xs text-gray-400 mt-1" id="subHeading">เลือกระบบที่ต้องการเข้าใช้งาน</p>
+            </div>
+
+            <div class="bg-[#f0f2f5] p-1 rounded-xl flex items-center justify-between mb-6">
+              <button class="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium transition-all duration-200 bg-white text-[#f36614] tab-active-shadow" id="roleStudentBtn" onclick="setRole('customer')" type="button">
+                <i data-lucide="user" class="w-4 h-4"></i><span>นักศึกษา / ลูกค้า</span>
+              </button>
+              <button class="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium transition-all duration-200 text-gray-500 hover:text-gray-700" id="roleMerchantBtn" onclick="setRole('merchant')" type="button">
+                <i data-lucide="store" class="w-4 h-4"></i><span>จัดการร้านค้า</span>
+              </button>
+            </div>
+
+            <form class="space-y-4 text-left" id="authForm" onsubmit="event.preventDefault(); persistCurrentUser();">
+              <div class="hidden transition-all duration-200 relative" id="fullNameFieldGroup">
+                <label class="block text-xs font-semibold text-gray-700 mb-1.5 ml-0.5" id="regNameLabel">ชื่อผู้ใช้งาน</label>
+                <input class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-1 focus:ring-[#f36614] outline-none" placeholder="เช่น คุณสมชาย หรือ ร้านก๋วยเตี๋ยวป้าแต๋ว" type="text" id="regName" autocomplete="off"/>
+              </div>
+              <div class="relative">
+                <label class="block text-xs font-semibold text-gray-700 mb-1.5 ml-0.5" id="loginIdLabel">อีเมล หรือ เบอร์โทรศัพท์</label>
+                <input class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-1 focus:ring-[#f36614] outline-none" placeholder="example@email.com" type="text" id="loginId" oninput="handleLoginSearch()" autocomplete="off"/>
+                <input type="hidden" id="selectedMerchantShopId" value=""/>
+                <!-- Autocomplete Dropdown -->
+                <div id="loginAutocompleteList" class="hidden login-autocomplete-list"></div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1.5 ml-0.5">รหัสผ่าน</label>
+                <input class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm tracking-widest focus:ring-1 focus:ring-[#f36614] outline-none" placeholder="••••••••" type="password" id="loginPass"/>
+              </div>
+              <div class="pt-3">
+                <button class="w-full bg-[#f36614] hover:bg-[#e0560a] active:scale-[0.99] text-white py-3 px-4 rounded-xl text-sm font-semibold shadow-md transition" id="submitBtn" type="submit">
+                  เข้าสู่ระบบ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <footer class="text-center text-xs select-none" id="loginFooter">
+          <span class="text-gray-500" id="footerPrompt">ยังไม่มีบัญชีใช่ไหม?</span>
+          <button class="text-[#f36614] font-semibold hover:underline ml-1" id="footerActionBtn" onclick="toggleAuthMode()" type="button">สร้างบัญชี</button>
+        </footer>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN: PROFILE SETTINGS                   -->
+      <!-- ========================================== -->
+      <div id="screen-profile" class="app-screen pb-20 bg-[#F4F6F9]">
+        <header class="bg-[#f36614] text-white px-4 pt-4 pb-3 flex items-center justify-between shadow-sm sticky top-0 z-30">
+          <div class="flex items-center space-x-2">
+            <button onclick="goBackFromProfile()" class="hover:opacity-80 transition p-1"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+            <h1 class="font-bold text-[17px] tracking-tight">ตั้งค่าโปรไฟล์</h1>
+          </div>
+        </header>
+
+        <main class="flex-1 p-5 space-y-4">
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col items-center">
+             <div class="w-20 h-20 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-3">
+                <i data-lucide="user" class="w-10 h-10"></i>
+             </div>
+             <p class="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1" id="profileRoleBadge">สถานะ: ลูกค้า</p>
+             <h2 class="text-lg font-bold text-gray-800" id="profileDisplayName">คุณลูกค้า</h2>
+          </div>
+
+          <form class="space-y-4 bg-white p-5 rounded-2xl shadow-sm border border-gray-100" onsubmit="event.preventDefault(); saveProfileSettings();">
+             <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1.5 ml-0.5" id="profileNameLabel">ชื่อผู้ใช้งาน (แสดงให้ผู้อื่นเห็น)</label>
+                <input class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-1 focus:ring-[#f36614] outline-none" type="text" id="editProfileName"/>
+             </div>
+             <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1.5 ml-0.5">อีเมล</label>
+                <input class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-1 focus:ring-[#f36614] outline-none" type="email" id="editProfileEmail"/>
+             </div>
+             <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1.5 ml-0.5">รหัสผ่านใหม่ (ปล่อยว่างถ้าไม่ต้องการเปลี่ยน)</label>
+                <input class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm tracking-widest focus:ring-1 focus:ring-[#f36614] outline-none" type="password" placeholder="••••••••" id="editProfilePass"/>
+             </div>
+             <div class="pt-2">
+                <button type="submit" class="w-full bg-[#f36614] hover:bg-[#e0560a] text-white py-3 rounded-xl font-bold text-sm shadow-md transition active:scale-[0.98]">
+                   บันทึกการเปลี่ยนแปลง
+                </button>
+             </div>
+          </form>
+        </main>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN 2: CANTEEN HOME (Customer)          -->
+      <!-- ========================================== -->
+      <div id="screen-home" class="app-screen pb-24 bg-[#f8f9fb]">
+        <header class="bg-white px-4 pt-3 pb-2.5 flex items-center justify-between sticky top-0 z-40 border-b border-gray-100">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#e64a19] to-[#ff7043] flex items-center justify-center text-white shadow-md">
+              <i data-lucide="zap" class="w-6 h-6 fill-current"></i>
+            </div>
+            <div>
+              <h1 class="text-base font-bold text-gray-900 leading-tight">Kin-Thur</h1>
+              <p class="text-[10px] tracking-wider text-[#ea580c] font-semibold uppercase">BOPHIT PHIMUK FAST LANE</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2.5 relative">
+            <div class="relative">
+               <button class="relative p-2 rounded-full text-gray-600 hover:bg-gray-100" onclick="toggleNotiDropdown(event)">
+                 <i data-lucide="bell" class="w-5 h-5"></i><span id="notiBellDot" class="hidden absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+               </button>
+               <div id="notiDropdown" class="dropdown-popup hidden absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 z-[100] flex-col overflow-hidden text-slate-800">
+                  <div class="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-600 border-b border-gray-100">การแจ้งเตือนล่าสุดของคุณ</div>
+                  <div id="notiDropdownContent" class="max-h-64 overflow-y-auto">
+                     <!-- JS Injected -->
+                  </div>
+               </div>
+            </div>
+
+            <div class="relative">
+               <button class="w-8 h-8 rounded-full bg-[#8c3e21] text-white flex items-center justify-center font-semibold text-xs shadow-sm hover:opacity-90 transition active:scale-95" onclick="toggleDropdown('custProfileDropdown', event)">
+                 <i data-lucide="user" class="w-4 h-4"></i>
+               </button>
+               <div id="custProfileDropdown" class="dropdown-popup hidden absolute right-0 top-full mt-2 w-40 bg-white rounded-xl shadow-lg border border-gray-100 z-[100] flex-col overflow-hidden text-slate-800">
+                  <button class="px-4 py-2.5 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2" onclick="openProfileSettings()"><i data-lucide="user" class="w-3.5 h-3.5"></i> โปรไฟล์ส่วนตัว</button>
+                  <button class="px-4 py-2.5 text-left text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-gray-100" onclick="logout()"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> ออกจากระบบ</button>
+               </div>
+            </div>
+          </div>
+        </header>
+
+        <main class="flex-1 px-3.5 py-3 space-y-3.5" id="homeMainContent">
+          <!-- Notification Widget for Active Order -->
+          <div id="homeActiveQueueWidget" class="hidden bg-[#fff6f2] border border-[#fbdcd0] rounded-2xl p-3 shadow-sm cursor-pointer relative overflow-hidden transition-all active:scale-[0.99]" onclick="showScreen('screen-queue')">
+             <div class="absolute right-[-10px] top-[-10px] opacity-10"><i data-lucide="bell-ring" class="w-20 h-20 text-[#e65100]"></i></div>
+             <div class="flex justify-between items-center mb-1 relative z-10">
+                <span class="text-xs font-bold text-[#e65100] flex items-center"><i data-lucide="bell-ring" class="w-3.5 h-3.5 mr-1"></i> คิวออเดอร์ของคุณ</span>
+                <span class="bg-[#f05a28] text-white text-[10px] px-2 py-0.5 rounded-full shadow-sm" id="homeWidgetStatus">กำลังปรุง</span>
+             </div>
+             <p class="text-[11px] text-gray-600 relative z-10">แตะเพื่อดูสถานะคิวและเวลาที่เหลือ</p>
+          </div>
+
+          <section class="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 flex items-center justify-between cursor-pointer" onclick="openProfileSettings()">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-[#fdeee9] flex items-center justify-center text-[#e65100]">
+                <i data-lucide="user" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-sm font-bold text-gray-800 welcome-name-display">สวัสดี คุณลูกค้า</span>
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                </div>
+                <div class="flex items-center gap-1 text-[11px] text-gray-500 mt-0.5">
+                  <i data-lucide="map-pin" class="w-3.5 h-3.5 text-gray-400"></i><span>โรงอาหารกลาง ชั้น 1</span>
+                </div>
+              </div>
+            </div>
+            <i data-lucide="settings" class="w-5 h-5 text-gray-300"></i>
+          </section>
+
+          <!-- Search Area -->
+          <section>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400"><i data-lucide="search" class="w-4 h-4"></i></span>
+              <input class="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-full text-xs focus:ring-1 focus:ring-orange-500 shadow-sm outline-none" placeholder="ค้นหาร้านอาหารหรือเมนู..." type="text" oninput="handleSearch(this.value)"/>
+            </div>
+          </section>
+
+          <nav class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1" id="categoryNav">
+            <button class="px-4 py-1.5 rounded-full bg-[#7a2200] text-white text-xs font-medium shrink-0 shadow-sm transition" onclick="filterCategory('all', this)">ทั้งหมด</button>
+            <button class="px-3.5 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 text-xs font-medium shrink-0 flex items-center gap-1.5 shadow-sm transition" onclick="filterCategory('favorite', this)"><i data-lucide="heart" class="w-3 h-3 mr-1 text-red-500 fill-current"></i> ร้านโปรด</button>
+            <button class="px-3.5 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 text-xs font-medium shrink-0 flex items-center gap-1.5 shadow-sm transition" onclick="filterCategory('noodle', this)"><span>🍜</span> ก๋วยเตี๋ยว</button>
+            <button class="px-3.5 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 text-xs font-medium shrink-0 flex items-center gap-1.5 shadow-sm transition" onclick="filterCategory('rice', this)"><span>🍛</span> ข้าวแกง</button>
+            <button class="px-3.5 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 text-xs font-medium shrink-0 flex items-center gap-1.5 shadow-sm transition" onclick="filterCategory('drink', this)"><span>🥤</span> เครื่องดื่ม</button>
+          </nav>
+
+          <section class="bg-[#fff6f2] border border-[#fbdcd0] rounded-xl p-3 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-[#f05a28] flex items-center justify-center text-white shrink-0 shadow-sm"><i data-lucide="filter" class="w-4 h-4 fill-current"></i></div>
+              <div>
+                <div class="text-xs font-bold text-gray-800 flex items-center gap-1"><span id="filterLabelText">จัดเรียง: ร้านแนะนำ</span></div>
+                <p class="text-[10px] text-gray-500">สั่งทันใจ เวลาน้อยไม่ต้องรอนาน</p>
+              </div>
+            </div>
+            <button class="text-[11px] font-semibold text-[#f05a28] bg-white border border-[#f48965]/40 rounded-full px-3 py-1 shadow-sm hover:bg-[#fff0eb] transition" onclick="openFilterModal()">เปิดกรอง</button>
+          </section>
+
+          <!-- Dynamic Shop List Container -->
+          <div id="homeShopList" class="space-y-4"></div>
+
+        </main>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN 3: STALLS (Customer)                -->
+      <!-- ========================================== -->
+      <div id="screen-stalls" class="app-screen pb-20 bg-[#F8F9FA]">
+        <header class="bg-[#F16E14] text-white pt-10 pb-3 px-4 flex items-center justify-between shadow-sm sticky top-0 z-30">
+          <div class="flex items-center space-x-2">
+            <button onclick="showScreen('screen-home')" class="hover:opacity-80 transition p-1"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+            <h1 class="font-bold text-[15px] tracking-tight">ร้านทั้งหมด</h1>
+          </div>
+          <span class="bg-[#A4C639] text-[#2C490C] text-[10px] font-semibold px-2.5 py-0.5 rounded-full tracking-wide shadow-sm">เปิด <span id="stallCount">4</span> ร้าน</span>
+        </header>
+
+        <main class="flex-1 p-3.5 space-y-3.5" id="allStallsList">
+          <!-- Rendered by JS -->
+        </main>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN 4: STORE MENU (Customer)            -->
+      <!-- ========================================== -->
+      <div id="screen-menu" class="app-screen pb-28 bg-[#f6f7fb]">
+        <header class="bg-[#f95f24] text-white px-4 pt-4 pb-3 sticky top-0 z-30 flex items-center justify-between shadow-sm">
+          <div class="flex items-center space-x-2">
+            <button onclick="showScreen('screen-stalls')" class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+            <h1 class="text-[17px] font-semibold tracking-wide">เลือกเมนูอาหาร</h1>
+          </div>
+        </header>
+
+        <main class="p-3.5 space-y-3.5 flex-1 pb-32" id="menuMainContent">
+          <!-- Skeleton injects here temporarily -->
+        </main>
+
+        <footer class="fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 pt-2 pb-6 z-40 shadow-[0_-4px_15px_rgba(0,0,0,0.06)]">
+          <div class="flex items-center justify-between text-[12.5px] font-medium pb-2 px-1">
+            <span class="text-slate-600 font-semibold" id="menuItemCount">รวม 0 รายการ</span>
+            <div><span class="text-slate-500 font-normal">ยอดสุทธิ</span> <span class="text-slate-900 font-bold ml-1 text-[15px]" id="menuTotalPrice">฿0</span></div>
+          </div>
+          <button class="w-full bg-[#f95f24] hover:bg-[#eb5216] active:scale-[0.98] text-white py-3 rounded-xl font-bold text-[14px] shadow-[0_4px_12px_rgba(249,95,36,0.35)] flex items-center justify-center space-x-2 transition-all disabled:opacity-50 disabled:active:scale-100" id="checkoutBtn" onclick="goToCheckout()" disabled>
+            <span id="menuCheckoutBtnText">เลือกอาหารเพื่อสั่ง</span><i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+        </footer>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN 5: CHECKOUT (Customer Timer)        -->
+      <!-- ========================================== -->
+      <div id="screen-checkout" class="app-screen pb-8 bg-slate-50">
+        <header class="bg-[#f25e14] text-white px-4 pt-3 pb-3 sticky top-0 z-30 flex items-center justify-between shadow-md">
+          <div class="flex items-center space-x-2">
+            <button class="p-1 hover:bg-orange-600 rounded-full active:scale-95 transition-colors" onclick="cancelCheckout()"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+            <h1 class="text-base sm:text-lg font-semibold tracking-tight">ชำระเงินใน <span id="checkoutTimerDisplay" class="font-mono text-yellow-300 ml-1">05:00</span></h1>
+          </div>
+        </header>
+
+        <main class="flex-1 p-3.5 space-y-3.5">
+          <section class="bg-[#dcfce7] border border-[#86efac] rounded-xl px-3.5 py-2.5 flex items-center space-x-2 text-[#15803d]">
+            <i data-lucide="shield-check" class="w-5 h-5 flex-shrink-0 text-[#16a34a]"></i>
+            <p class="text-xs font-medium leading-tight">โปรดสแกนจ่ายและแนบสลิปเพื่อยืนยันออเดอร์เข้าครัวทันที</p>
+          </section>
+
+          <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div class="flex items-start justify-between pb-3 border-b border-dashed border-slate-200">
+              <div class="flex items-start space-x-3">
+                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-orange-50 text-orange-600 font-bold text-sm border border-orange-200" id="chkBooth"></span>
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h2 class="font-bold text-slate-800 text-sm leading-tight" id="chkShopName"></h2>
+                    <span class="bg-[#dcfce7] text-[#15803d] text-[10px] px-2 py-0.5 rounded-full font-semibold">เตรียมไวใน <span id="chkPrepMins">5</span> นาที</span>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-1 flex items-center"><i data-lucide="clock" class="w-3.5 h-3.5 mr-1"></i> นัดรับเวลา <strong class="text-slate-700 ml-1" id="chkPickupTime"></strong></p>
+                </div>
+              </div>
+            </div>
+
+            <div class="py-3 space-y-2 border-b border-dashed border-slate-200 text-xs" id="chkOrderItems"></div>
+
+            <div class="pt-3 flex justify-between items-center">
+              <span class="text-xs font-medium text-slate-600">ยอดชำระสุทธิ</span>
+              <span class="text-xl font-bold text-[#f25e14] tracking-tight" id="chkTotalPrice"></span>
+            </div>
+          </section>
+
+          <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col items-center">
+            <div class="inline-flex items-center space-x-1.5 bg-[#e0e7ff] text-[#4338ca] text-xs font-semibold px-3 py-1 rounded-full mb-3">
+              <i data-lucide="qr-code" class="w-3.5 h-3.5"></i><span class="tracking-wide">ชำระเงินด่วน (Fast Lane)</span>
+            </div>
+            <div class="w-56 h-56 bg-slate-100 rounded-2xl flex flex-col items-center justify-center p-3 relative border border-slate-200/80 shadow-inner">
+              <i data-lucide="qr-code" class="w-40 h-40 text-slate-800"></i>
+              <div class="mt-2 bg-orange-50 border border-orange-200/80 px-2.5 py-0.5 rounded text-[10px] text-orange-700 font-medium">พร้อมเพย์ <span id="chkQrShop"></span></div>
+            </div>
+            <div class="text-center mt-3">
+              <div class="text-2xl font-bold text-[#f25e14]" id="chkQrPrice"></div>
+              <p class="text-xs text-slate-700 font-medium mt-0.5">บัญชี: พร้อมเพย์ร้าน <span id="chkAccName"></span></p>
+              <div class="flex items-center justify-center space-x-1.5 mt-1 text-xs text-slate-500">
+                <span class="font-mono tracking-wider">089-xxx-4567</span>
+                <button class="p-1 text-slate-400 hover:text-slate-600 transition-colors" onclick="copyPromptPay()"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2.5 w-full mt-4">
+              <button class="flex items-center justify-center space-x-1.5 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold" onclick="downloadQR()"><i data-lucide="download" class="w-4 h-4"></i><span>บันทึกรูป QR</span></button>
+              <button class="flex items-center justify-center space-x-1.5 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold" id="copyBtnText" onclick="copyPromptPay()"><i data-lucide="copy" class="w-4 h-4"></i><span>คัดลอกเบอร์</span></button>
+            </div>
+          </section>
+
+          <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold text-slate-800">แนบสลิปยืนยันการโอนเงิน</h3>
+              <span class="inline-flex items-center text-[11px] text-emerald-600 font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span>ตรวจสลิปอัตโนมัติ</span>
+            </div>
+            <div class="dashed-upload bg-orange-50/40 hover:bg-orange-50/70 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer active:scale-[0.99] transition" id="uploadSlipBtn" onclick="simulateUpload()">
+              <div class="w-11 h-11 rounded-full bg-orange-100/90 text-orange-600 flex items-center justify-center mb-2.5 transition-colors" id="uploadIcon"><i data-lucide="upload" class="w-6 h-6"></i></div>
+              <span class="text-xs font-semibold text-slate-800 mb-0.5" id="uploadText">แตะเพื่อจำลองการแนบสลิป</span>
+              <span class="text-[11px] text-slate-400" id="uploadSub">(คลิกที่นี่เพื่อไปต่อ)</span>
+            </div>
+          </section>
+
+          <section class="pt-2 pb-6">
+            <button class="w-full bg-[#f25e14] hover:bg-[#e0530d] text-white py-3.5 px-4 rounded-2xl font-bold text-sm flex items-center justify-center space-x-2 shadow-lg opacity-50 pointer-events-none transition-all active:scale-[0.98]" id="confirmPaymentBtn" onclick="confirmPayment()">
+              <i data-lucide="check-circle" class="w-5 h-5 text-white/90"></i><span id="chkBtnPrice">ยืนยันการชำระเงิน</span>
+            </button>
+          </section>
+        </main>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN 6: QUEUE PASS (Customer Realtime)   -->
+      <!-- ========================================== -->
+      <div id="screen-queue" class="app-screen pb-24 bg-[#f8f9fc]">
+        <header class="bg-[#f06124] text-white px-4 pt-3 pb-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center p-1 border border-white/30 backdrop-blur-sm"><i data-lucide="ticket" class="w-4 h-4"></i></div>
+            <div>
+              <h1 class="text-base font-bold leading-tight">คิวของฉัน</h1>
+              <p class="text-[10px] font-semibold text-orange-100 uppercase">MY QUEUE PASS</p>
+            </div>
+          </div>
+        </header>
+
+        <main class="flex-1 px-3.5 py-4 space-y-4">
+          <div id="queueTicketContainer">
+            <div class="text-center text-slate-400 py-10 mt-10"><i data-lucide="ticket" class="w-12 h-12 mx-auto mb-2 opacity-50"></i>ยังไม่มีออเดอร์ในขณะนี้</div>
+          </div>
+        </main>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN 7: HISTORY (Customer)               -->
+      <!-- ========================================== -->
+      <div id="screen-history" class="app-screen pb-24 bg-[#f7f9fc]">
+        <header class="bg-[#f26315] text-white px-3.5 py-3 sticky top-0 z-30 flex items-center justify-between shadow-sm">
+          <div class="flex items-center space-x-2">
+            <button class="hover:opacity-80 p-0.5 transition" onclick="showScreen('screen-home')"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+            <h1 class="text-base font-semibold">ประวัติการสั่งซื้อ</h1>
+          </div>
+        </header>
+
+        <main class="p-3.5 space-y-3.5" id="historyListContainer">
+          <!-- Rendered by JS -->
+        </main>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- REVIEW RATING MODAL (Customer)             -->
+      <!-- ========================================== -->
+      <div id="reviewModal" class="hidden fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4" onclick="closeReviewModal(event)">
+         <div class="bg-white rounded-3xl w-full max-w-sm p-6 text-center shadow-2xl relative" onclick="event.stopPropagation()">
+            <button onclick="closeReviewModal(true)" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            <div class="w-16 h-16 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center mx-auto mb-4"><i data-lucide="star" class="w-8 h-8 fill-current"></i></div>
+            <h2 class="text-lg font-bold text-gray-800 mb-1">ให้คะแนนร้านค้านี้</h2>
+            <p class="text-xs text-gray-500 mb-4" id="reviewShopNameText">ร้าน...</p>
+            
+            <div class="flex justify-center gap-2 mb-4" id="starRatingContainer">
+               <div class="p-1 cursor-pointer" onclick="setReviewRating(1)"><i data-lucide="star" class="w-8 h-8 text-gray-300 pointer-events-none transition review-star"></i></div>
+               <div class="p-1 cursor-pointer" onclick="setReviewRating(2)"><i data-lucide="star" class="w-8 h-8 text-gray-300 pointer-events-none transition review-star"></i></div>
+               <div class="p-1 cursor-pointer" onclick="setReviewRating(3)"><i data-lucide="star" class="w-8 h-8 text-gray-300 pointer-events-none transition review-star"></i></div>
+               <div class="p-1 cursor-pointer" onclick="setReviewRating(4)"><i data-lucide="star" class="w-8 h-8 text-gray-300 pointer-events-none transition review-star"></i></div>
+               <div class="p-1 cursor-pointer" onclick="setReviewRating(5)"><i data-lucide="star" class="w-8 h-8 text-gray-300 pointer-events-none transition review-star"></i></div>
+            </div>
+            
+            <textarea id="reviewCommentText" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm mb-5 focus:outline-none focus:ring-1 focus:ring-orange-500" placeholder="พิมพ์ความประทับใจหรือข้อเสนอแนะ... (ไม่บังคับ)" rows="2"></textarea>
+
+            <input type="hidden" id="reviewTargetShopId" value="">
+            <input type="hidden" id="reviewCurrentStars" value="0">
+            <button class="w-full bg-[#f36614] text-white font-bold py-3 rounded-xl disabled:opacity-50 transition" id="submitReviewBtn" onclick="submitReview()" disabled>ส่งรีวิว</button>
+         </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN: VIEW REVIEWS                       -->
+      <!-- ========================================== -->
+      <div id="screen-view-reviews" class="app-screen bg-slate-50 pb-20">
+        <header class="bg-[#f36614] text-white px-4 pt-10 pb-4 shadow-sm sticky top-0 z-30">
+          <div class="flex items-center justify-between">
+             <div class="flex items-center space-x-2">
+               <button onclick="goBackFromReviews()" class="hover:opacity-80 transition p-1"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+               <h1 class="font-bold text-lg tracking-tight">รีวิวร้านค้า</h1>
+             </div>
+          </div>
+        </header>
+
+        <main class="flex-1 p-4 overflow-y-auto">
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col items-center mb-4">
+             <h2 class="text-sm font-bold text-gray-800 mb-1" id="vrShopName">ชื่อร้าน</h2>
+             <div class="text-4xl font-black text-amber-500 mb-1" id="vrAvgRating">0.0</div>
+             <div class="flex text-amber-400 mb-1" id="vrStarsVisual">
+                 <!-- Star icons -->
+             </div>
+             <p class="text-[11px] text-gray-500">จากทั้งหมด <span id="vrTotalReviews">0</span> รีวิว</p>
+          </div>
+
+          <div class="space-y-3" id="vrReviewList">
+              <!-- Reviews Injected Here -->
+          </div>
+        </main>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN 8: MERCHANT KDS (Merchant Realtime) -->
+      <!-- ========================================== -->
+      <div id="screen-merchant-kds" class="app-screen pb-20 bg-[#F4F6F9]">
+        <header class="bg-white px-4 pt-3 pb-2.5 shadow-sm border-b border-gray-100 sticky top-0 z-30">
+          <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2.5">
+                <div class="w-10 h-10 rounded-xl bg-[#FEECE5] flex items-center justify-center text-[#FF5722]"><i data-lucide="store" class="w-5 h-5"></i></div>
+                <div class="leading-tight">
+                  <div class="flex items-center space-x-1.5">
+                    <h1 class="font-bold text-xs sm:text-[13px] text-gray-900" id="merchantHeaderTitle">รายการออเดอร์</h1>
+                    <span class="bg-gray-100 text-gray-500 text-[10px] px-1.5 py-0.5 rounded font-medium" id="merchantHeaderBooth">บูธ 04</span>
+                  </div>
+                  <div class="flex items-center space-x-2 text-[10.5px] mt-0.5 text-gray-500 font-medium">
+                    <span class="flex items-center text-[#D97706]"><span class="w-1.5 h-1.5 rounded-full bg-[#EAB308] mr-1 inline-block"></span>รอปรุง <span id="kdsPendingCount">0</span></span>
+                    <span class="text-gray-300">•</span>
+                    <span class="flex items-center text-[#16A34A]"><span class="w-1.5 h-1.5 rounded-full bg-[#22C55E] mr-1"></span>กำลังปรุง <span id="kdsCookingCount">0</span></span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center space-x-3 relative">
+                 <!-- Toggle Pause Shop -->
+                 <label class="relative inline-flex items-center cursor-pointer" title="เปิด/ปิด รับออเดอร์">
+                    <input type="checkbox" id="merchantPauseToggle" class="sr-only peer toggle-checkbox" onchange="toggleShopPauseStatus(this)"/>
+                    <div class="w-9 h-5 bg-red-400 rounded-full peer peer-checked:bg-[#0d6842] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                 </label>
+
+                 <button class="w-8 h-8 rounded-full bg-[#E5734A] text-white flex items-center justify-center font-medium shadow-sm transition hover:bg-[#d85b37]" onclick="toggleDropdown('merchProfileDropdown_kds', event)">
+                   <i data-lucide="user" class="w-4 h-4"></i>
+                 </button>
+                 <div id="merchProfileDropdown_kds" class="dropdown-popup hidden absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 z-[100] flex-col overflow-hidden text-slate-800">
+                    <button class="px-4 py-2.5 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100" onclick="openShopReviewsAsMerchant()"><i data-lucide="star" class="w-3.5 h-3.5"></i> ดูรีวิวร้านค้า</button>
+                    <button class="px-4 py-2.5 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2" onclick="openProfileSettings()"><i data-lucide="user" class="w-3.5 h-3.5"></i> ตั้งค่าโปรไฟล์ร้าน</button>
+                    <button class="px-4 py-2.5 text-left text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-b border-gray-100" onclick="clearDashboardData()"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> เริ่มวันใหม่ (ล้างประวัติ)</button>
+                    <button class="px-4 py-2.5 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2" onclick="logout()"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> ออกจากระบบ</button>
+                 </div>
+              </div>
+          </div>
+          <!-- Shop Paused Banner -->
+          <div id="shopPausedBanner" class="hidden mt-2 bg-red-50 border border-red-200 text-red-600 text-[10px] font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1"><i data-lucide="pause-circle" class="w-3.5 h-3.5"></i> คุณได้พักการรับออเดอร์ชั่วคราว ลูกค้าจะไม่สามารถสั่งได้</div>
+        </header>
+
+        <main class="p-3.5 space-y-3">
+          <nav class="bg-gray-200/70 p-1 rounded-2xl flex items-center text-xs mt-2">
+            <button class="flex-1 bg-white text-gray-800 font-semibold py-2 rounded-xl shadow-sm flex items-center justify-center space-x-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>จัดการออเดอร์</span></button>
+            <button class="flex-1 text-gray-600 font-medium py-2 rounded-xl flex items-center justify-center space-x-1.5 hover:text-gray-900 transition" onclick="showScreen('screen-merchant-inventory')"><i data-lucide="package" class="w-4 h-4"></i><span>คลังเมนู & วัตถุดิบ</span></button>
+          </nav>
+
+          <section class="space-y-3 mt-4" id="merchantOrderList">
+            <!-- Active Order Card rendered by JS (Drag/Drop supported) -->
+          </section>
+        </main>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN 9: MERCHANT INVENTORY               -->
+      <!-- ========================================== -->
+      <div id="screen-merchant-inventory" class="app-screen pb-20 bg-[#f0f4f9]">
+        <header class="p-3.5 pb-2 pt-4 bg-white sticky top-0 z-30 shadow-sm border-b border-gray-100">
+          <nav class="bg-[#e4ebf5] p-1 rounded-2xl flex items-center shadow-inner">
+            <button class="flex-1 py-2 flex items-center justify-center gap-1.5 text-xs text-[#526079] font-medium transition" onclick="showScreen('screen-merchant-kds')">
+              <i data-lucide="layout-list" class="w-4 h-4"></i><span>รายการออเดอร์</span>
+            </button>
+            <button class="flex-1 py-2 bg-white rounded-xl shadow-sm flex items-center justify-center gap-1.5 text-xs text-[#a04e12] font-semibold transition">
+              <i data-lucide="package" class="w-4 h-4 text-[#a04e12]"></i><span>คลังเมนู & วัตถุดิบ</span>
+            </button>
+          </nav>
+        </header>
+
+        <main class="flex-1 px-3.5 pt-3 space-y-3 relative">
+          <div class="flex justify-between items-center mb-1 px-1">
+             <h1 class="font-bold text-slate-800">ระบบคลังเมนู</h1>
+             <button class="bg-[#b33d06] text-white text-[11px] font-semibold px-2 py-1.5 rounded-lg flex items-center gap-1 shadow-sm active:scale-95 transition" onclick="openMenuModal()"><i data-lucide="plus" class="w-3.5 h-3.5"></i> เพิ่มเมนู</button>
+          </div>
+
+          <section class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i data-lucide="search" class="w-4 h-4"></i></span>
+              <input class="w-full bg-white border border-slate-200 text-xs rounded-xl pl-9 pr-3 py-2 focus:ring-1 focus:ring-orange-500 outline-none" placeholder="ค้นหาเมนูในร้าน..." type="text"/>
+            </div>
+          </section>
+
+          <section class="space-y-3" id="merchantMenuList">
+            <!-- Rendered via JS -->
+          </section>
+        </main>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SCREEN 10: MERCHANT DASHBOARD (ยอดขาย)     -->
+      <!-- ========================================== -->
+      <div id="screen-merchant-dashboard" class="app-screen pb-20 bg-[#F4F6F9]">
+        <header class="shrink-0 bg-white px-4 pt-4 pb-3 shadow-sm border-b border-gray-100 flex items-center justify-between z-30">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-[#E8F5E9] flex items-center justify-center text-[#2E7D32]"><i data-lucide="bar-chart-2" class="w-5 h-5"></i></div>
+            <div class="leading-tight">
+              <h1 class="font-bold text-xs sm:text-[13px] text-gray-900">สรุปยอดขาย</h1>
+              <div class="text-[10px] mt-0.5 text-gray-500 font-medium">สถิติเชิงลึก (Advanced Dashboard)</div>
+            </div>
+          </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-3.5 space-y-4 no-scrollbar pb-20">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-gradient-to-br from-[#FF5722] to-[#E64A19] rounded-2xl p-4 text-white shadow-md">
+              <p class="text-[11px] font-medium opacity-90 mb-1">ยอดขายรวม (บาท)</p>
+              <h2 class="text-2xl font-bold font-mono" id="dashSalesTotal">฿0</h2>
+            </div>
+            <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              <p class="text-[11px] font-medium text-gray-500 mb-1">จำนวนออเดอร์ทั้งหมด</p>
+              <h2 class="text-2xl font-bold text-gray-800 font-mono" id="dashSalesCount">0</h2>
+            </div>
+          </div>
+
+          <!-- Advanced Stats: Best Sellers -->
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div class="flex items-center mb-3 border-b border-gray-50 pb-2">
+              <i data-lucide="trending-up" class="w-4 h-4 text-orange-500 mr-1.5"></i>
+              <h3 class="font-bold text-[13px] text-gray-800">เมนูยอดฮิต 3 อันดับแรก</h3>
+            </div>
+            <div id="dashBestSellers" class="space-y-2 text-xs">
+              <!-- JS Injected -->
+              <div class="text-center text-gray-400 py-2">ยังไม่มีข้อมูล</div>
+            </div>
+          </div>
+
+          <!-- Advanced Stats: Peak Hours Chart -->
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div class="flex items-center mb-3 border-b border-gray-50 pb-2">
+              <i data-lucide="bar-chart" class="w-4 h-4 text-blue-500 mr-1.5"></i>
+              <h3 class="font-bold text-[13px] text-gray-800">ช่วงเวลาออเดอร์เข้าเยอะสุด</h3>
+            </div>
+            <div class="h-32 flex items-end justify-between gap-1 mt-4" id="dashPeakChart">
+               <!-- JS Injected CSS Bars -->
+               <div class="w-full text-center text-gray-400 text-xs self-center">ยังไม่มีข้อมูลเพียงพอ</div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mt-4">
+            <div class="flex items-center justify-between mb-3 border-b border-gray-50 pb-2">
+              <h3 class="font-bold text-[13px] text-gray-800">ประวัติการขายล่าสุด</h3>
+              <span class="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">สำเร็จ</span>
+            </div>
+            <div id="dashRecentOrders" class="space-y-3">
+              <!-- JS Injected -->
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- FILTER MODAL (Bottom Sheet)                -->
+      <!-- ========================================== -->
+      <div id="filterModal" class="hidden fixed inset-0 z-50 bg-black/50 flex flex-col justify-end" onclick="closeFilterModal(event)">
+        <div class="modal-content bg-white w-full rounded-t-3xl p-5" onclick="event.stopPropagation()">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-lg text-slate-800">จัดเรียงร้านค้า</h3>
+            <button onclick="closeFilterModal(true)" class="p-1 text-slate-400 hover:text-slate-600 transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+          <div class="space-y-3">
+            <label class="flex items-center justify-between p-3 border border-slate-100 rounded-xl cursor-pointer hover:bg-orange-50 transition">
+              <span class="font-medium text-slate-700">ร้านแนะนำ (ค่าเริ่มต้น)</span>
+              <input type="radio" name="filterSort" value="default" class="text-orange-600 focus:ring-orange-500" checked>
+            </label>
+            <label class="flex items-center justify-between p-3 border border-slate-100 rounded-xl cursor-pointer hover:bg-orange-50 transition">
+              <span class="font-medium text-slate-700">รอคิวน้อยที่สุด (< 5 นาที)</span>
+              <input type="radio" name="filterSort" value="fast" class="text-orange-600 focus:ring-orange-500">
+            </label>
+            <label class="flex items-center justify-between p-3 border border-slate-100 rounded-xl cursor-pointer hover:bg-orange-50 transition">
+              <span class="font-medium text-slate-700">เรตติ้งสูงสุด</span>
+              <input type="radio" name="filterSort" value="rating" class="text-orange-600 focus:ring-orange-500">
+            </label>
+          </div>
+          <button class="w-full mt-6 bg-[#f36614] text-white py-3.5 rounded-xl font-bold active:scale-95 transition" onclick="applyFilter()">ดูผลลัพธ์</button>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- MENU FORM MODAL (Add/Edit)                 -->
+      <!-- ========================================== -->
+      <div id="menuFormModal" class="hidden fixed inset-0 z-50 bg-black/50 flex flex-col justify-end" onclick="closeMenuModal(event)">
+        <div class="modal-content bg-white w-full rounded-t-3xl p-5" onclick="event.stopPropagation()">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-lg text-slate-800" id="menuModalTitle">เพิ่มเมนูใหม่</h3>
+            <button onclick="closeMenuModal(true)" class="p-1 text-slate-400 hover:text-slate-600 transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+          <form onsubmit="event.preventDefault(); saveMenuData();" class="space-y-3">
+            <input type="hidden" id="formMenuId" value="" />
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">ชื่อเมนู</label>
+              <input id="formMenuName" required type="text" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-1 focus:ring-orange-500 outline-none"/>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">รายละเอียด</label>
+              <input id="formMenuDesc" type="text" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-1 focus:ring-orange-500 outline-none"/>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">ราคา (บาท)</label>
+              <input id="formMenuPrice" required type="number" min="0" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-1 focus:ring-orange-500 outline-none"/>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">URL รูปภาพ (เว้นว่างไว้เพื่อใช้รูปเริ่มต้น)</label>
+              <input id="formMenuImg" type="url" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-1 focus:ring-orange-500 outline-none"/>
+            </div>
+            <button type="submit" class="w-full mt-4 bg-[#f36614] text-white py-3.5 rounded-xl font-bold active:scale-95 transition">บันทึกข้อมูล</button>
+          </form>
+        </div>
+      </div>
+
+    </div> <!-- End Scrolling wrapper -->
+
+    <!-- ========================================== -->
+    <!-- GLOBAL CUSTOMER BOTTOM NAV                 -->
+    <!-- ========================================== -->
+    <nav id="customer-nav" class="hidden shrink-0 bg-white border-t border-gray-200 px-4 py-1.5 flex items-center justify-around z-40 shadow-[0_-4px_15px_rgba(0,0,0,0.04)]">
+      <button onclick="showScreen('screen-home')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-400 py-1 px-3 transition hover:text-gray-600" data-target="screen-home"><i data-lucide="home" class="w-5 h-5"></i><span class="text-[10px] font-medium">หน้าหลัก</span></button>
+      <button onclick="showScreen('screen-stalls')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-400 py-1 px-3 transition hover:text-gray-600" data-target="screen-stalls"><i data-lucide="store" class="w-5 h-5"></i><span class="text-[10px] font-medium">ร้านค้า</span></button>
+      <button onclick="showScreen('screen-queue')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-400 py-1 px-3 relative transition hover:text-gray-600" data-target="screen-queue"><i data-lucide="ticket" class="w-5 h-5"></i><span class="text-[10px] font-medium">คิวของฉัน</span><span id="navBadge" class="hidden absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full border border-white"></span></button>
+      <button onclick="showScreen('screen-history')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-400 py-1 px-3 transition hover:text-gray-600" data-target="screen-history"><i data-lucide="history" class="w-5 h-5"></i><span class="text-[10px] font-medium">ประวัติ</span></button>
+    </nav>
+
+    <!-- ========================================== -->
+    <!-- GLOBAL MERCHANT BOTTOM NAV                 -->
+    <!-- ========================================== -->
+    <nav id="merchant-nav" class="hidden shrink-0 bg-white border-t border-gray-200 px-4 py-1.5 flex items-center justify-around z-50 shadow-[0_-4px_15px_rgba(0,0,0,0.04)]">
+      <button onclick="showScreen('screen-merchant-kds')" class="nav-btn flex flex-col items-center gap-0.5 text-[#FF5722] py-1 px-3 transition" data-target="screen-merchant-kds"><i data-lucide="layout-list" class="w-5 h-5 fill-current"></i><span class="text-[10px] font-bold">ออเดอร์</span></button>
+      <button onclick="showScreen('screen-merchant-inventory')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-400 py-1 px-3 transition hover:text-gray-600" data-target="screen-merchant-inventory"><i data-lucide="package" class="w-5 h-5"></i><span class="text-[10px] font-medium">คลังเมนู</span></button>
+      <button onclick="showScreen('screen-merchant-dashboard')" class="nav-btn flex flex-col items-center gap-0.5 text-gray-400 py-1 px-3 transition hover:text-gray-600" data-target="screen-merchant-dashboard"><i data-lucide="bar-chart-2" class="w-5 h-5"></i><span class="text-[10px] font-medium">ยอดขาย</span></button>
+    </nav>
+
+  </div> <!-- End Mobile Container -->
+
+  <!-- HTML5 Audio Elements for Sound Alerts -->
+  <audio id="soundMerchantNewOrder" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
+  <audio id="soundCustomerReady" src="https://assets.mixkit.co/active_storage/sfx/2866/2866-preview.mp3" preload="auto"></audio>
+
+  <!-- ========================================== -->
+  <!-- JAVASCRIPT LOGIC & FIREBASE SYNC           -->
+  <!-- ========================================== -->
+  <script>
+    // --- Versioning ---
+    let currentSessionUser = null;
+    let currentSessionShopId = null;
+
+    const CURRENT_DATA_VERSION = '1.17'; 
+    if(localStorage.getItem('kt_data_version') !== CURRENT_DATA_VERSION) {
+        localStorage.setItem('kt_data_version', CURRENT_DATA_VERSION);
+    }
+
+    // --- FIREBASE SETUP ---
+    const firebaseConfig = {
+      // ⚠️ IMPORTANT: กรุณาแทนที่ค่าเหล่านี้ด้วย Config จากโปรเจกต์ Firebase ของคุณ
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+
+    // --- Firebase Listeners (ดึงข้อมูลเรียลไทม์มาเก็บลงเครื่อง) ---
+    db.ref('shops').on('value', snapshot => {
+        if (snapshot.exists()) {
+            localStorage.setItem('kt_shopsData', JSON.stringify(snapshot.val()));
+            const activeId = document.querySelector('.app-screen.active')?.id;
+            if(activeId === 'screen-home') renderHomeShops();
+            if(activeId === 'screen-stalls') renderAllStalls();
+            if(activeId === 'screen-menu' && currentShopId) renderMenuPageContent();
+            if(activeId === 'screen-merchant-inventory') renderMerchantInventory();
+        } else {
+            db.ref('shops').set(defaultShopsData);
+        }
+    });
+
+    db.ref('orders').on('value', snapshot => {
+        const data = snapshot.exists() ? snapshot.val() : [];
+        localStorage.setItem('kt_allOrders', JSON.stringify(data));
+        // ฟังก์ชัน startBackgroundSync จะจัดการดักจับและขึ้นแจ้งเตือนให้เองอัตโนมัติ
+    });
+
+    db.ref('notifications').on('value', snapshot => {
+        const data = snapshot.exists() ? snapshot.val() : [];
+        localStorage.setItem('kt_notifications', JSON.stringify(data));
+        if (currentUserRole === 'customer') renderNotifications();
+    });
+
+    db.ref('reviews').on('value', snapshot => {
+        const data = snapshot.exists() ? snapshot.val() : [];
+        localStorage.setItem('kt_reviews', JSON.stringify(data));
+        const activeId = document.querySelector('.app-screen.active')?.id;
+        if(activeId === 'screen-view-reviews') {
+            const targetId = document.getElementById('reviewTargetShopId').value;
+            if(targetId) renderReviewsPage(targetId);
+        }
+    });
+
+    // --- Audio & Haptic System ---
+    function playSound(type) {
+        try {
+            if(type === 'new-order') {
+                const audio = document.getElementById('soundMerchantNewOrder');
+                if(audio) { audio.currentTime = 0; audio.play(); }
+            } else if(type === 'ready') {
+                const audio = document.getElementById('soundCustomerReady');
+                if(audio) { audio.currentTime = 0; audio.play(); }
+            }
+        } catch(e) { console.log("Sound play blocked by browser policy"); }
+    }
+
+    function vibrateDevice(pattern = 100) {
+        if ("vibrate" in navigator) {
+            navigator.vibrate(pattern);
+        }
+    }
+
+    // --- Toast Notification System ---
+    function showToast(message, type = 'info', useSound = true) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+
+      let icon = 'info';
+      if(type === 'success') icon = 'check-circle';
+      else if(type === 'error') icon = 'alert-circle';
+      else if(type === 'warning' || type === 'new-order') icon = 'bell-ring';
+
+      if(useSound && type === 'new-order') playSound('new-order');
+      if(useSound && message.includes('อาหารของคุณเสร็จแล้ว')) playSound('ready');
+
+      toast.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i> <span class="flex-1">${message}</span>`;
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000); 
+    }
+
+    // --- Dropdown Logic ---
+    function toggleDropdown(id, event) {
+        event.stopPropagation();
+        document.querySelectorAll('.dropdown-popup').forEach(el => {
+            if(el.id !== id) el.classList.add('hidden');
+        });
+        document.getElementById(id).classList.toggle('hidden');
+    }
+
+    // --- Favorites Logic ---
+    function getFavorites() {
+        const data = localStorage.getItem('kt_favorites');
+        return data ? JSON.parse(data) : [];
+    }
+    
+    function toggleFavorite(shopId, event) {
+        event.stopPropagation(); 
+        let favs = getFavorites();
+        const index = favs.indexOf(shopId);
+        if(index > -1) {
+            favs.splice(index, 1);
+            showToast('ลบออกจากร้านโปรดแล้ว', 'info', false);
+        } else {
+            favs.push(shopId);
+            showToast('บันทึกร้านโปรดเรียบร้อย ❤️', 'success', false);
+        }
+        localStorage.setItem('kt_favorites', JSON.stringify(favs));
+        
+        const heartIcons = document.querySelectorAll(`.fav-icon-${shopId}`);
+        heartIcons.forEach(icon => {
+            if(index > -1) {
+                icon.classList.remove('fill-current', 'text-red-500');
+                icon.classList.add('text-gray-300');
+            } else {
+                icon.classList.remove('text-gray-300');
+                icon.classList.add('fill-current', 'text-red-500');
+            }
+        });
+        
+        if(currentCategory === 'favorite') renderHomeShops();
+    }
+
+    // --- Reviews Logic ---
+    function getAllReviews() {
+        const data = localStorage.getItem('kt_reviews');
+        return data ? JSON.parse(data) : [];
+    }
+
+    function saveAllReviews(reviews) {
+        db.ref('reviews').set(reviews); // ส่งขึ้น Firebase
+    }
+
+    // --- Profile Settings Logic ---
+    let previousScreen = 'screen-home';
+    
+    function openProfileSettings() {
+      document.querySelectorAll('.dropdown-popup').forEach(el => el.classList.add('hidden'));
+      
+      const uName = currentSessionUser || localStorage.getItem('kt_currentUserName') || 'ลูกค้า';
+      document.getElementById('profileDisplayName').innerText = 'คุณ' + uName;
+      document.getElementById('editProfileName').value = uName;
+      
+      if(currentUserRole === 'merchant') {
+          document.getElementById('profileRoleBadge').innerText = 'สถานะ: ร้านค้า';
+          document.getElementById('profileNameLabel').innerText = 'ชื่อผู้ดูแลร้าน / ชื่อร้าน';
+      } else {
+          document.getElementById('profileRoleBadge').innerText = 'สถานะ: ลูกค้า';
+          document.getElementById('profileNameLabel').innerText = 'ชื่อผู้ใช้งาน (แสดงให้ผู้อื่นเห็น)';
+      }
+      
+      document.getElementById('editProfilePass').value = ''; 
+
+      document.querySelectorAll('.app-screen').forEach(el => {
+         if(el.classList.contains('active') && el.id !== 'screen-profile') {
+             previousScreen = el.id;
+         }
+      });
+
+      showScreen('screen-profile');
+    }
+
+    function goBackFromProfile() {
+      showScreen(previousScreen);
+    }
+
+    function saveProfileSettings() {
+      const newName = document.getElementById('editProfileName').value;
+      if(newName && newName.trim() !== '') {
+          const oldName = currentSessionUser || localStorage.getItem('kt_currentUserName') || 'ลูกค้า';
+          
+          if(currentUserRole === 'customer') {
+              let allOrders = getAllOrders();
+              let changedOrder = false;
+              allOrders.forEach(o => {
+                 if(o.userName === oldName) { o.userName = newName.trim(); changedOrder = true; }
+              });
+              if(changedOrder) saveAllOrders(allOrders);
+
+              let allNotifs = getNotifications();
+              let changedNotif = false;
+              allNotifs.forEach(n => {
+                 if(n.userName === oldName) { n.userName = newName.trim(); changedNotif = true; }
+              });
+              if(changedNotif) saveNotifications(allNotifs);
+
+          } else if(currentUserRole === 'merchant') {
+              const activeShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+              const shops = getShopsData();
+              const shop = shops.find(s => s.id === activeShopId);
+              if(shop) {
+                  shop.name = newName.trim();
+                  saveShopsData(shops);
+                  document.getElementById('merchantHeaderBooth').innerText = `บูธ ${shop.booth} (${shop.name})`;
+              }
+          }
+
+          currentSessionUser = newName.trim();
+          localStorage.setItem('kt_currentUserName', newName.trim());
+          document.querySelectorAll('.welcome-name-display').forEach(el => el.innerText = `สวัสดี คุณ${newName.trim()}`);
+          showToast('บันทึกโปรไฟล์สำเร็จ', 'success', false);
+          goBackFromProfile();
+      } else {
+          showToast('กรุณากรอกชื่อให้ครบถ้วน', 'error');
+      }
+    }
+
+    // --- Notifications Logic ---
+    function getNotifications() {
+        const data = localStorage.getItem('kt_notifications');
+        return data ? JSON.parse(data) : [];
+    }
+
+    function saveNotifications(notifs) {
+        db.ref('notifications').set(notifs); // ส่งขึ้น Firebase
+    }
+
+    function addNotification(userName, title, message, type) {
+        const notifs = getNotifications();
+        notifs.push({ 
+            id: Date.now(), 
+            userName: userName, 
+            title: title, 
+            message: message, 
+            type: type, 
+            isRead: false, 
+            time: new Date().toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'}) 
+        });
+        saveNotifications(notifs);
+    }
+
+    function toggleNotiDropdown(event) {
+        toggleDropdown('notiDropdown', event);
+        
+        const uName = currentSessionUser || localStorage.getItem('kt_currentUserName') || 'ลูกค้า';
+        let notifs = getNotifications();
+        let changed = false;
+        notifs.forEach(n => {
+            if(n.userName === uName && !n.isRead) {
+                n.isRead = true;
+                changed = true;
+            }
+        });
+        if(changed) {
+            saveNotifications(notifs);
+            renderNotifications();
+        }
+    }
+
+    function renderNotifications() {
+        const uName = currentSessionUser || localStorage.getItem('kt_currentUserName') || 'ลูกค้า';
+        const allNotifs = getNotifications().filter(n => n.userName === uName).reverse();
+        const unreadCount = allNotifs.filter(n => !n.isRead).length;
+
+        const bellDot = document.getElementById('notiBellDot');
+        if(bellDot) {
+            if(unreadCount > 0) bellDot.classList.remove('hidden');
+            else bellDot.classList.add('hidden');
+        }
+
+        const dropdownContent = document.getElementById('notiDropdownContent');
+        if(dropdownContent) {
+            if(allNotifs.length === 0) {
+                dropdownContent.innerHTML = `<div class="p-4 text-center text-gray-400 text-xs">ยังไม่มีการแจ้งเตือน</div>`;
+            } else {
+                let html = '';
+                allNotifs.forEach(n => {
+                    const iconColor = n.type === 'Cooking' ? 'bg-orange-500' : 'bg-emerald-500';
+                    const fontClass = n.isRead ? 'font-normal' : 'font-bold';
+                    html += `
+                    <div class="p-3 text-xs border-b border-gray-50 flex gap-2 items-start hover:bg-gray-50 cursor-pointer" onclick="showScreen('screen-queue')">
+                         <div class="w-2 h-2 mt-1 rounded-full ${iconColor} shrink-0"></div>
+                         <div>
+                            <div class="${fontClass} text-gray-800">${n.title}</div>
+                            <div class="text-gray-500 text-[10px] mt-0.5">${n.message}</div>
+                            <div class="text-[9px] text-gray-400 mt-1">${n.time}</div>
+                         </div>
+                    </div>`;
+                });
+                dropdownContent.innerHTML = html;
+            }
+        }
+    }
+
+    window.onclick = function(e) {
+        if (!e.target.closest('.relative')) {
+            document.querySelectorAll('.dropdown-popup').forEach(el => el.classList.add('hidden'));
+            
+            const autoCompleteList = document.getElementById('loginAutocompleteList');
+            if(autoCompleteList && !autoCompleteList.classList.contains('hidden')) {
+                autoCompleteList.classList.add('hidden');
+            }
+        }
+    }
+
+    // --- Part 1: Core Backend Logic ---
+    const KinThurLogic = {
+      baseSlots: ['11:45 น.', '12:00 น.', '12:15 น.', '12:30 น.', '12:45 น.', '13:00 น.'],
+      maxQuotaPerSlot: 10,
+      getBookedCount: function(shopId, timeSlot) {
+          const allOrders = getAllOrders();
+          return allOrders.filter(o => o.shopId === shopId && o.time === timeSlot && o.status !== 'Completed' && o.status !== 'Cancelled').length;
+      }
+    };
+
+    const defaultShopsData = [
+      {
+        id: 's1', name: 'ร้านป้าน้อย ก๋วยเตี๋ยวรสเด็ด', desc: 'ก๋วยเตี๋ยวหมูต้มยำ น้ำตก เย็นตาโฟ', booth: '01', category: 'noodle', rating: 4.8, reviewCount: 120, prepMins: 5, isPaused: false,
+        quickNotes: ['ไม่ใส่ผักชี', 'เผ็ดน้อย', 'ไม่ใส่กระเทียมเจียว', 'ขอน้ำซุปเพิ่ม'],
+        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDH7QehWbWnDd2bBumFo9sd8qPnkT5jVUTXlhA52J5K-XKhsiaRY5ShktkUlURqB9GZneriXQmxOHbthnfMhYS2CD7gBepeJYCGIqJGJZzQuQeCrLuF8FUJUmubxscY320s-ZZIcIp3nVjuvR1u7YCh_2C4GSLFG35XgokmNFqULcKRJoUa8_tv58tqP4RylmVr4l44jCe03rblRlmGBQndCC7WhXO9V_Tq-iU6mloNs0wLsLc9wAR8',
+        menus: [
+          { id: 'm1_1', name: 'ก๋วยเตี๋ยวต้มยำหมูสับ', desc: 'หมูสับนุ่มๆ มะนาวแท้', price: 50, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAgvFIlaLkIbwvoXgPpyOJSzC8PUfn-AWL2pUQ1XcM18aeMa1zRxdYWl0B3mo9-j4ek2BXsbmImtm3gGKeBpJOlbE5qYm1PtBqTsfr9_OIG5zxLQijWWZMtXzfLWhvK3OLcNuhj5yAP3vIA2Bx7UOezeEfAZCw6ITe0S3lNfF-MErz1gLSbBTLZAugu_bne2-qeOD98aNDmamkYcHE2wLgfciLXcBdlP07umO9cR5K7kaDEJxdLIXhi', status: 'available' },
+          { id: 'm1_2', name: 'บะหมี่เกี๊ยวหมูแดง', desc: 'เกี๊ยวหมูแน่น หมูแดงอบน้ำผึ้ง', price: 65, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCyDIvTnAy4TCxOX3TV7byXwJv7FzxpVP6NrtvWNX-r5_Y7nY6kmw1jXvrv1-kUntAUVap0ourzM9awf7Q1iumDjJZWRMoQDyc4UGB6s7JD4GAZ6I_3gsToSC0_U4dFw8WwVQ-jQBCcQakulUDlTyi2gbdDbt_d309x34UjLm7rtp9w23VXPnyLa_OcQisSIzj9Z-3HjbERujsJofxwImKQe1iN9EPrVuWlgy6A-jLLQbtMSis7zYfR', status: 'available' },
+          { id: 'm1_3', name: 'เกี๊ยวหมูทอดกรอบ', desc: 'แป้งเกี๊ยวบางกรอบ ไส้หมูเน้นๆ', price: 30, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB_9B2PObfzYbEDA6JrY_NQJQvLe_3k6c0_4bYuYk5FNfU13nHjpP-IkyBVUif2TrxFuvRZ8QIShj3Ap1Qf8kuctxbmPQgIL21_wGEt3JT4OBPDQSiQIyUGV0Pu7R34DSIPf8eqwlmccUpw2VL2K6JWxlv4QFVB0H70zcNzzIFSRnk_0Ms9SllDSlbEDgi32kYp_v5q6uKsfFTG_oteFOPQ2buNKx9_TScIpXYkF9m6_5eWf6ip3PjD', status: 'out' }
+        ]
+      },
+      {
+        id: 's2', name: 'ร้านลุงเจริญ ข้าวแกง 10 อย่าง', desc: 'คั่วกลิ้งหมูสับ, แกงส้มปลากะพง ฯลฯ', booth: '02', category: 'rice', rating: 4.6, reviewCount: 85, prepMins: 3, isPaused: false,
+        quickNotes: ['ราดข้าวเลย', 'แยกกับข้าว', 'ขอข้าวเยอะ', 'เผ็ดน้อย'],
+        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCsTrBmZ0heUy8wTYdx2JHiAJ1UaGNga9mLg3Z5Owxmekvo0H5oL9p7iVcwzFnXz-b42ZGR02leJi-3AAQVSmTGVdmq0sWA4TCfOFUK8okAc4lD-PaobHXi3lJvEyihWiya8R0ljoPNv3EKJBjOtDPgmwmFxX2yTZF3knsrKOrK-4KflK-YBmb3Y1qyPIjOY5OyxEUTmODcZ7N1BxZZFsINMfx_txiqGApnj7TuyqksiNTsd856sI-9',
+        menus: [
+          { id: 'm2_1', name: 'ข้าวราดแกง 1 อย่าง', desc: 'เลือกกับข้าวหน้าตู้ได้เลย', price: 40, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCsTrBmZ0heUy8wTYdx2JHiAJ1UaGNga9mLg3Z5Owxmekvo0H5oL9p7iVcwzFnXz-b42ZGR02leJi-3AAQVSmTGVdmq0sWA4TCfOFUK8okAc4lD-PaobHXi3lJvEyihWiya8R0ljoPNv3EKJBjOtDPgmwmFxX2yTZF3knsrKOrK-4KflK-YBmb3Y1qyPIjOY5OyxEUTmODcZ7N1BxZZFsINMfx_txiqGApnj7TuyqksiNTsd856sI-9', status: 'available' }
+        ]
+      },
+      {
+        id: 's3', name: 'ร้านเจ๊จู ข้าวมันไก่-หมูแดง', desc: 'ข้าวมันไก่ตอนเนื้อนุ่ม, ข้าวหมูแดงหมูกรอบ', booth: '07', category: 'rice', rating: 4.7, reviewCount: 200, prepMins: 8, isPaused: false,
+        quickNotes: ['ไม่เอาหนัง', 'เอาเลือด', 'ขอน้ำจิ้มเยอะๆ', 'เอาเนื้อน่อง'],
+        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBj1HZgkldU6yfSIV19EPgkvtGXYHlDB30UYGgOEMmUX9_nH0smmLZa05LHBX5kH4yHOBZ56x4dT-RdzB7Oslkbq3TIIm8Vsev82QFKIdFCe_KWD-aiKrTR8296uP-wuEqyXE40wXfHQnKemexBVFI1IYTjnEeroFEmcg3LH2e4nxEianuCGSnW2ZzrxKR1g5BeK0PUu_xduIUFhjr0M8-NZ7OgIo3OMrFKVDrfD4QVungBvdkakiqG',
+        menus: [
+          { id: 'm3_1', name: 'ข้าวมันไก่ต้ม', desc: 'ข้าวมันหอมนุ่ม ไก่ฉ่ำๆ', price: 50, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBj1HZgkldU6yfSIV19EPgkvtGXYHlDB30UYGgOEMmUX9_nH0smmLZa05LHBX5kH4yHOBZ56x4dT-RdzB7Oslkbq3TIIm8Vsev82QFKIdFCe_KWD-aiKrTR8296uP-wuEqyXE40wXfHQnKemexBVFI1IYTjnEeroFEmcg3LH2e4nxEianuCGSnW2ZzrxKR1g5BeK0PUu_xduIUFhjr0M8-NZ7OgIo3OMrFKVDrfD4QVungBvdkakiqG', status: 'available' }
+        ]
+      },
+      {
+        id: 's4', name: 'ร้านพี่กิ๊ก น้ำปั่น & กาแฟสด', desc: 'ชาไทยเย็น กาแฟโบราณ น้ำผลไม้ปั่น', booth: '11', category: 'drink', rating: 5.0, reviewCount: 50, prepMins: 2, isPaused: false,
+        quickNotes: ['หวานน้อย', 'หวานปกติ', 'แยกน้ำแข็ง', 'ไม่ใส่มุก'],
+        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDksG9bL11u1OOz6LGWwu-CSn3IKhEql1Bm4FLFRohmOB9XDAL2-_j_keclpqks7nHw2t18R1dqV8WyfRRwyUt65Sr965ezsHwfyUQsjGAVFuGeGo4N3NJtZ_PAdv6hZst_odQiJwF8bX9XFRRP6gRtnLgY1JCprMfz7D1ovRAxZw8iMqE9VX2HCcHnjtc5GqeRkx6E9XK744GNqCxzw_Eqp0cKonXhn7ur7RV9rZA0QQEYeyDl_yNT',
+        menus: [
+          { id: 'm4_1', name: 'ชาไทยเย็น', desc: 'ชาซีลอนแท้ หอมมัน', price: 30, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDksG9bL11u1OOz6LGWwu-CSn3IKhEql1Bm4FLFRohmOB9XDAL2-_j_keclpqks7nHw2t18R1dqV8WyfRRwyUt65Sr965ezsHwfyUQsjGAVFuGeGo4N3NJtZ_PAdv6hZst_odQiJwF8bX9XFRRP6gRtnLgY1JCprMfz7D1ovRAxZw8iMqE9VX2HCcHnjtc5GqeRkx6E9XK744GNqCxzw_Eqp0cKonXhn7ur7RV9rZA0QQEYeyDl_yNT', status: 'available' }
+        ]
+      }
+    ];
+
+    function getShopsData() {
+        const data = localStorage.getItem('kt_shopsData');
+        return data ? JSON.parse(data) : defaultShopsData;
+    }
+
+    function saveShopsData(data) {
+        db.ref('shops').set(data); // ส่งขึ้น Firebase
+    }
+
+    function getAllOrders() { 
+      const data = localStorage.getItem('kt_allOrders'); 
+      return data ? JSON.parse(data) : []; 
+    }
+    
+    function saveAllOrders(ordersArray) { 
+      db.ref('orders').set(ordersArray); // ส่งขึ้น Firebase
+    }
+
+    function getMyActiveOrders() {
+      const uName = currentSessionUser || localStorage.getItem('kt_currentUserName') || 'ลูกค้า';
+      const orders = getAllOrders();
+      return orders.filter(o => o.userName === uName && o.status !== 'Completed' && o.status !== 'Cancelled');
+    }
+
+    function getActiveOrdersForMerchant() {
+      const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+      const allOrders = getAllOrders();
+      return allOrders.filter(o => o.shopId === activeMerchantShopId && o.status !== 'Completed' && o.status !== 'Cancelled');
+    }
+
+    function getRealtimeShopQueue(shopId) {
+        const allOrders = getAllOrders();
+        const activeCount = allOrders.filter(o => o.shopId === shopId && (o.status === 'Pending' || o.status === 'Cooking')).length;
+        const shop = getShopsData().find(s => s.id === shopId);
+        const pMins = shop ? (shop.prepMins || 5) : 5;
+        let estimatedTime = activeCount * pMins;
+        let timeStr = estimatedTime === 0 ? 'พร้อมทำทันที' : `ประมาณ ${estimatedTime} นาที`;
+        return { queueCount: activeCount, timeStr: timeStr };
+    }
+
+    let currentUserRole = 'customer';
+    let currentShopId = null;
+    let cart = {}; 
+    let currentFilter = 'default';
+    let currentCategory = 'all';
+    
+    let checkoutInterval = null; 
+    let syncInterval = null;
+    let queueTimerInterval = null;
+
+    lucide.createIcons();
+
+    // --- Part 2: Login & Flow ---
+    
+    function handleLoginSearch() {
+        if(currentUserRole !== 'merchant') return;
+        
+        const input = document.getElementById('loginId');
+        const val = input.value.toLowerCase().trim();
+        const listDiv = document.getElementById('loginAutocompleteList');
+        const shops = getShopsData();
+        
+        document.getElementById('selectedMerchantShopId').value = "";
+
+        if(!val) {
+            listDiv.classList.add('hidden');
+            return;
+        }
+
+        const matches = shops.filter(s => s.name.toLowerCase().includes(val));
+        
+        let html = '';
+        if(matches.length > 0) {
+            matches.forEach(s => {
+                html += `<div class="login-autocomplete-item" onclick="selectLoginShop('${s.id}', '${s.name}')">
+                            <i data-lucide="store" class="w-4 h-4 text-gray-400"></i>
+                            <div>
+                                <span class="font-bold text-gray-800">${s.name}</span> 
+                                <span class="text-[11px] text-gray-500">(บูธ ${s.booth})</span>
+                            </div>
+                         </div>`;
+            });
+        }
+        
+        if(html === '') {
+            listDiv.classList.add('hidden');
+        } else {
+            listDiv.innerHTML = html;
+            listDiv.classList.remove('hidden');
+            lucide.createIcons();
+        }
+    }
+
+    function selectLoginShop(shopId, shopName) {
+        document.getElementById('loginId').value = shopName;
+        document.getElementById('selectedMerchantShopId').value = shopId;
+        document.getElementById('loginAutocompleteList').classList.add('hidden');
+        document.getElementById('loginPass').focus();
+    }
+
+    function toggleAuthMode() {
+      const mode = document.getElementById('mainHeading').innerText.includes('กลับมา') ? 'reg' : 'login';
+      document.getElementById('mainHeading').innerText = mode === 'login' ? 'ยินดีต้อนรับกลับมา' : 'สร้างบัญชีใหม่';
+      
+      document.getElementById('fullNameFieldGroup').classList.toggle('hidden');
+      
+      if(currentUserRole === 'merchant') {
+         document.getElementById('regNameLabel').innerText = 'ชื่อร้านค้าที่จะสร้างใหม่';
+      } else {
+         document.getElementById('regNameLabel').innerText = 'ชื่อผู้ใช้งาน';
+      }
+      
+      document.getElementById('submitBtn').innerText = mode === 'login' ? 'เข้าสู่ระบบ' : 'ลงทะเบียน';
+      document.getElementById('footerPrompt').innerText = mode === 'login' ? 'ยังไม่มีบัญชีใช่ไหม?' : 'มีบัญชีอยู่แล้ว?';
+      document.getElementById('footerActionBtn').innerText = mode === 'login' ? 'สร้างบัญชี' : 'เข้าสู่ระบบ';
+    }
+
+    function setRole(role) {
+      currentUserRole = role;
+      const cBtn = document.getElementById('roleStudentBtn');
+      const mBtn = document.getElementById('roleMerchantBtn');
+      
+      // Reset inputs
+      document.getElementById('regName').value = '';
+      document.getElementById('loginId').value = '';
+      document.getElementById('selectedMerchantShopId').value = '';
+      document.getElementById('loginAutocompleteList').classList.add('hidden');
+      
+      if (role === 'customer') {
+        cBtn.className = "flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium bg-white text-[#f36614] tab-active-shadow transition";
+        mBtn.className = "flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 transition";
+        document.getElementById('regNameLabel').innerText = 'ชื่อผู้ใช้งาน';
+        document.getElementById('loginIdLabel').innerText = 'อีเมล หรือ เบอร์โทรศัพท์';
+        document.getElementById('loginId').placeholder = 'example@email.com';
+      } else {
+        mBtn.className = "flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium bg-white text-[#f36614] tab-active-shadow transition";
+        cBtn.className = "flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 transition";
+        document.getElementById('regNameLabel').innerText = 'ชื่อร้านค้าที่จะสร้างใหม่';
+        document.getElementById('loginIdLabel').innerText = 'ค้นหาร้านค้า หรือ อีเมล';
+        document.getElementById('loginId').placeholder = 'พิมพ์ชื่อร้านค้าเพื่อเข้าสู่ระบบ...';
+      }
+    }
+
+    function persistCurrentUser() {
+      const mode = document.getElementById('mainHeading').innerText.includes('สร้าง') ? 'reg' : 'login';
+      
+      if(currentUserRole === 'customer') {
+          let rawName = document.getElementById('regName').value || document.getElementById('loginId').value.split('@')[0];
+          let cleanName = rawName.replace(/^คุณ/g, '').trim();
+          if(!cleanName) cleanName = 'ลูกค้า';
+          
+          currentSessionUser = cleanName;
+          localStorage.setItem('kt_currentUserName', cleanName);
+          document.querySelectorAll('.welcome-name-display').forEach(el => el.innerText = `สวัสดี คุณ${cleanName}`);
+          
+          startBackgroundSync();
+          showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับคุณ ${cleanName}`, 'success', false);
+          renderNotifications();
+          showScreen('screen-home');
+          
+      } else if (currentUserRole === 'merchant') {
+          const shopNameInput = mode === 'reg' ? document.getElementById('regName').value.trim() : document.getElementById('loginId').value.trim();
+          let selectedShopId = document.getElementById('selectedMerchantShopId').value;
+          
+          if(mode === 'reg') {
+              if(!shopNameInput) {
+                  showToast('กรุณากรอกชื่อร้านค้าเพื่อลงทะเบียน', 'error', false);
+                  return;
+              }
+              const shops = getShopsData();
+              const newShopId = 's_new_' + Date.now();
+              const newBooth = Math.floor(Math.random() * (99 - 12 + 1)) + 12;
+              
+              const newShop = {
+                  id: newShopId, 
+                  name: shopNameInput, 
+                  desc: 'ร้านค้าเปิดใหม่ในระบบ', 
+                  booth: newBooth.toString(), 
+                  category: 'rice', 
+                  rating: 5.0, 
+                  reviewCount: 0,
+                  prepMins: 5,
+                  isPaused: false,
+                  quickNotes: ['พิเศษ', 'ธรรมดา'],
+                  img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCsTrBmZ0heUy8wTYdx2JHiAJ1UaGNga9mLg3Z5Owxmekvo0H5oL9p7iVcwzFnXz-b42ZGR02leJi-3AAQVSmTGVdmq0sWA4TCfOFUK8okAc4lD-PaobHXi3lJvEyihWiya8R0ljoPNv3EKJBjOtDPgmwmFxX2yTZF3knsrKOrK-4KflK-YBmb3Y1qyPIjOY5OyxEUTmODcZ7N1BxZZFsINMfx_txiqGApnj7TuyqksiNTsd856sI-9', 
+                  menus: []
+              };
+
+              shops.push(newShop);
+              saveShopsData(shops);
+              selectedShopId = newShopId;
+              showToast(`ลงทะเบียนร้าน "${shopNameInput}" สำเร็จ!`, 'success', false);
+          } else {
+              if(!selectedShopId && shopNameInput) {
+                 const shops = getShopsData();
+                 const match = shops.find(s => s.name.toLowerCase() === shopNameInput.toLowerCase() || s.name.toLowerCase().includes(shopNameInput.toLowerCase()));
+                 if(match) selectedShopId = match.id;
+              }
+
+              if(!selectedShopId) {
+                  showToast('ไม่พบร้านค้านี้ในระบบ กรุณาพิมพ์และเลือกร้านจากรายการ', 'error', false);
+                  return;
+              }
+          }
+
+          const finalShop = getShopsData().find(s => s.id === selectedShopId);
+          if(finalShop) {
+              currentSessionShopId = finalShop.id;
+              currentSessionUser = finalShop.name;
+              localStorage.setItem('kt_activeMerchantShopId', finalShop.id);
+              localStorage.setItem('kt_currentUserName', finalShop.name);
+              document.getElementById('merchantHeaderBooth').innerText = `บูธ ${finalShop.booth} (${finalShop.name})`;
+              
+              document.getElementById('merchantPauseToggle').checked = finalShop.isPaused;
+              updateShopPauseUI(finalShop.isPaused);
+
+              startBackgroundSync();
+              if(mode !== 'reg') showToast(`เข้าสู่ระบบจัดการ ${finalShop.name}`, 'success', false);
+              showScreen('screen-merchant-kds');
+          }
+      }
+    }
+
+    function logout() {
+      clearInterval(checkoutInterval);
+      clearInterval(syncInterval);
+      clearInterval(queueTimerInterval);
+      cart = {}; 
+      
+      document.getElementById('regName').value = '';
+      document.getElementById('loginId').value = '';
+      document.getElementById('loginPass').value = '';
+      document.getElementById('selectedMerchantShopId').value = '';
+      
+      currentSessionUser = null;
+      currentSessionShopId = null;
+
+      if(currentUserRole === 'merchant') {
+          localStorage.removeItem('kt_activeMerchantShopId');
+      }
+
+      document.querySelectorAll('.dropdown-popup').forEach(el => el.classList.add('hidden'));
+      document.getElementById('loginAutocompleteList').classList.add('hidden');
+
+      setRole('customer');
+      if (document.getElementById('mainHeading').innerText.includes('สร้าง')) {
+         toggleAuthMode(); 
+      }
+      showScreen('screen-login');
+      showToast('ออกจากระบบแล้ว', 'info', false);
+    }
+
+    // Skeleton Simulation
+    function showSkeleton(containerId, isCard = true) {
+        const container = document.getElementById(containerId);
+        if(!container) return;
+        
+        let html = '';
+        if(isCard) {
+            for(let i=0; i<3; i++) {
+                html += `
+                <div class="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm flex items-center gap-3">
+                  <div class="w-16 h-16 rounded-xl skeleton shrink-0"></div>
+                  <div class="space-y-2 flex-1">
+                    <div class="h-4 w-3/4 skeleton rounded"></div>
+                    <div class="h-3 w-1/2 skeleton rounded"></div>
+                    <div class="h-3 w-1/4 skeleton rounded mt-2"></div>
+                  </div>
+                </div>`;
+            }
+        } else {
+           html = `
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 relative">
+               <div class="flex justify-between items-start">
+                  <div class="space-y-2 flex-1"><div class="h-3 w-1/3 skeleton rounded"></div><div class="h-4 w-2/3 skeleton rounded"></div></div>
+                  <div class="w-10 h-10 rounded-full skeleton shrink-0 ml-2"></div>
+               </div>
+            </div>
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 h-20 skeleton mt-3"></div>
+            <div class="space-y-3 mt-3">
+               <div class="h-4 w-1/4 skeleton rounded mb-2"></div>
+               <div class="h-24 w-full skeleton rounded-2xl"></div>
+               <div class="h-24 w-full skeleton rounded-2xl"></div>
+            </div>
+           `;
+        }
+        container.innerHTML = html;
+    }
+
+    // Routing
+    function showScreen(screenId) {
+      document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
+      const activeScreen = document.getElementById(screenId);
+      if (activeScreen) {
+        activeScreen.classList.add('active');
+        const scrollable = activeScreen.querySelector('.overflow-y-auto');
+        if(scrollable) scrollable.scrollTop = 0;
+      }
+
+      const customerNav = document.getElementById('customer-nav');
+      const merchantNav = document.getElementById('merchant-nav');
+      
+      customerNav.classList.add('hidden');
+      merchantNav.classList.add('hidden');
+
+      if (['screen-home', 'screen-stalls', 'screen-queue', 'screen-history'].includes(screenId)) {
+        customerNav.classList.remove('hidden');
+        updateNavState(customerNav, screenId, 'text-[#e64a19]');
+      } else if (['screen-merchant-kds', 'screen-merchant-inventory', 'screen-merchant-dashboard'].includes(screenId)) {
+        merchantNav.classList.remove('hidden');
+        updateNavState(merchantNav, screenId, 'text-[#FF5722]');
+      }
+
+      if(screenId === 'screen-home') {
+          showSkeleton('homeShopList', true);
+          setTimeout(() => renderHomeShops(), 600);
+      }
+      if(screenId === 'screen-stalls') {
+          showSkeleton('allStallsList', true);
+          setTimeout(() => renderAllStalls(), 600);
+      }
+      if(screenId === 'screen-menu' && currentShopId) { 
+          const container = document.getElementById('menuMainContent');
+          if(!container.innerHTML.includes('menuShopName')) {
+             showSkeleton('menuMainContent', false); 
+             setTimeout(() => renderMenuPageContent(), 500);
+          }
+      }
+
+      if(screenId === 'screen-history') renderHistory();
+      if(screenId === 'screen-queue') { lastQueueState = null; renderActiveQueue(); }
+      if(screenId === 'screen-merchant-kds') { lastKdsState = null; renderKDS(); }
+      if(screenId === 'screen-merchant-inventory') renderMerchantInventory();
+      if(screenId === 'screen-merchant-dashboard') renderDashboard();
+      lucide.createIcons();
+    }
+
+    function updateNavState(navElement, targetScreen, activeColorClass) {
+      navElement.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.className = "nav-btn flex flex-col items-center gap-0.5 text-gray-400 transition hover:text-gray-600";
+        if (btn.dataset.target === targetScreen) {
+          btn.className = `nav-btn flex flex-col items-center gap-0.5 ${activeColorClass} font-bold transition`;
+          const icon = btn.querySelector('svg'); // Lucide change tags
+          if(icon) icon.classList.add('fill-current');
+        } else {
+          const icon = btn.querySelector('svg');
+          if(icon) icon.classList.remove('fill-current');
+        }
+      });
+    }
+
+    function goBackFromReviews() {
+        if(currentUserRole === 'merchant') showScreen('screen-merchant-kds');
+        else showScreen('screen-home');
+    }
+
+    // Filter & Search
+    function openFilterModal() { document.getElementById('filterModal').classList.remove('hidden'); }
+    function closeFilterModal(e) { document.getElementById('filterModal').classList.add('hidden'); }
+    function applyFilter() {
+      currentFilter = document.querySelector('input[name="filterSort"]:checked').value;
+      if(currentFilter === 'fast') document.getElementById('filterLabelText').innerText = 'จัดเรียง: คิวน้อยที่สุด (< 5 นาที)';
+      else if(currentFilter === 'rating') document.getElementById('filterLabelText').innerText = 'จัดเรียง: เรตติ้งสูงสุด';
+      else document.getElementById('filterLabelText').innerText = 'จัดเรียง: ร้านแนะนำ';
+      
+      closeFilterModal();
+      showSkeleton('homeShopList', true);
+      setTimeout(() => renderHomeShops(), 400);
+    }
+    
+    function filterCategory(cat, btnElement) {
+      currentCategory = cat;
+      const nav = document.getElementById('categoryNav');
+      nav.querySelectorAll('button').forEach(btn => {
+        btn.classList.replace('bg-[#7a2200]', 'bg-white');
+        btn.classList.replace('text-white', 'text-gray-700');
+        const svg = btn.querySelector('svg');
+        if(svg && svg.classList.contains('lucide-heart')) svg.classList.replace('text-white', 'text-red-500'); 
+      });
+      btnElement.classList.replace('bg-white', 'bg-[#7a2200]');
+      btnElement.classList.replace('text-gray-700', 'text-white');
+      const svg = btnElement.querySelector('svg');
+      if(svg && svg.classList.contains('lucide-heart')) svg.classList.replace('text-red-500', 'text-white');
+
+      showSkeleton('homeShopList', true);
+      setTimeout(() => renderHomeShops(), 400);
+    }
+
+    function handleSearch(val) { renderHomeShops(val); }
+
+    function getProcessedShops(keyword = '') {
+      let filtered = getShopsData().filter(s => {
+        const matchName = s.name.toLowerCase().includes(keyword.toLowerCase());
+        let matchCat = false;
+        
+        if(currentCategory === 'favorite') {
+            matchCat = getFavorites().includes(s.id);
+        } else {
+            matchCat = currentCategory === 'all' || s.category === currentCategory;
+        }
+
+        if(currentFilter === 'fast') {
+            const rt = getRealtimeShopQueue(s.id);
+            const estMins = rt.queueCount * (s.prepMins || 5);
+            if(estMins >= 5) return false;
+        }
+        return matchName && matchCat;
+      });
+
+      if(currentFilter === 'queue' || currentFilter === 'fast') {
+          filtered.sort((a,b) => getRealtimeShopQueue(a.id).queueCount - getRealtimeShopQueue(b.id).queueCount);
+      }
+      else if (currentFilter === 'rating') filtered.sort((a,b) => b.rating - a.rating);
+      return filtered;
+    }
+
+    function createShopHTML(shop, isHero = false) {
+      const rtQueue = getRealtimeShopQueue(shop.id);
+      const isFav = getFavorites().includes(shop.id);
+      const heartClass = isFav ? 'text-red-500 fill-current' : 'text-gray-300';
+      const pausedHtml = shop.isPaused ? `<div class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center"><span class="bg-gray-800 text-white px-3 py-1 rounded-full text-xs font-bold opacity-90 shadow-sm"><i data-lucide="pause-circle" class="w-3.5 h-3.5 inline mr-1"></i>ร้านพักรับออเดอร์</span></div>` : '';
+
+      if(isHero) {
+        return `
+          <article class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden transition relative ${shop.isPaused ? 'grayscale-[50%]' : ''}">
+            ${pausedHtml}
+            <div class="relative h-44 w-full bg-gray-200 overflow-hidden cursor-pointer active:scale-[0.99]" onclick="${shop.isPaused ? '' : `openShop('${shop.id}')`}">
+              <img class="w-full h-full object-cover" src="${shop.img}"/>
+              <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30"></div>
+              <div class="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                <span class="bg-[#f05a28] text-white text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm"><span class="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span> FAST LANE แนะนำ</span>
+                <span class="bg-black/60 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-md font-medium">บูธ ${shop.booth}</span>
+              </div>
+              <div class="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-[11px] text-white">
+                <div class="flex items-center gap-2">
+                  <span class="bg-black/70 px-2 py-0.5 rounded-md flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3 text-emerald-400"></i> ETA: ${rtQueue.timeStr}</span>
+                  <span class="bg-[#f05a28]/90 font-medium px-2 py-0.5 rounded-md">คิวรอ: ${rtQueue.queueCount}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-sm p-1.5 rounded-full flex items-center gap-1 shadow-sm transition active:scale-90 z-20 cursor-pointer" onclick="toggleFavorite('${shop.id}', event)">
+              <i data-lucide="heart" class="w-4 h-4 fav-icon-${shop.id} ${heartClass}"></i>
+            </div>
+
+            <div class="p-3.5 space-y-3">
+              <div class="flex justify-between items-start">
+                  <div class="cursor-pointer active:opacity-70" onclick="${shop.isPaused ? '' : `openShop('${shop.id}')`}"><h2 class="text-base font-bold text-gray-900 leading-tight">${shop.name}</h2><p class="text-[11px] text-gray-500 line-clamp-1 mt-0.5">${shop.desc}</p></div>
+                  <div class="flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded shrink-0 cursor-pointer hover:bg-amber-100 transition" onclick="openShopReviewsAsCustomer('${shop.id}')">
+                     <i data-lucide="star" class="w-3 h-3 fill-current"></i><span class="font-bold">${shop.rating}</span> <span class="text-amber-600/70">(${shop.reviewCount||0})</span>
+                  </div>
+              </div>
+              <button onclick="${shop.isPaused ? '' : `openShop('${shop.id}')`}" class="w-full bg-gradient-to-r ${shop.isPaused ? 'from-gray-400 to-gray-500' : 'from-[#f05a28] to-[#ff6b3d]'} text-white py-3 px-4 rounded-xl font-medium text-sm flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition">
+                ${shop.isPaused ? 'ร้านพักชั่วคราว' : `ดูเมนูและสั่งล่วงหน้า (สั่งทันที) <span class="font-bold">➔</span>`}
+              </button>
+            </div>
+          </article>
+        `;
+      }
+      return `
+        <article class="bg-white rounded-2xl p-3 border border-gray-200/80 shadow-sm flex items-center justify-between transition relative ${shop.isPaused ? 'grayscale-[50%]' : ''}">
+          ${pausedHtml}
+          <div class="flex items-center gap-3 w-full cursor-pointer active:scale-[0.99]" onclick="${shop.isPaused ? '' : `openShop('${shop.id}')`}">
+            <div class="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-100">
+              <img class="w-full h-full object-cover" src="${shop.img}"/>
+              <span class="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] text-center font-medium py-0.5">บูธ ${shop.booth}</span>
+            </div>
+            <div class="space-y-1 flex-1 pr-2">
+              <h3 class="text-xs font-bold text-gray-900 leading-tight">${shop.name}</h3>
+              <p class="text-[10px] text-gray-500 line-clamp-1">${shop.desc}</p>
+              <div class="flex items-center gap-1.5 pt-0.5">
+                <span class="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> ${rtQueue.timeStr}</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col items-end justify-between self-stretch shrink-0 z-20">
+            <div class="flex items-center gap-0.5 text-xs bg-gray-50 px-1 rounded cursor-pointer active:scale-90" onclick="toggleFavorite('${shop.id}', event)">
+                <i data-lucide="heart" class="w-3.5 h-3.5 fav-icon-${shop.id} ${heartClass}"></i>
+            </div>
+            <div class="flex items-center gap-0.5 mt-auto cursor-pointer hover:opacity-70" onclick="openShopReviewsAsCustomer('${shop.id}')">
+                <span class="text-amber-400">★</span><span class="font-bold text-gray-700 text-[11px]">${shop.rating}</span>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderHomeShops(keyword = '') {
+      const myOrders = getMyActiveOrders();
+      const w = document.getElementById('homeActiveQueueWidget');
+      
+      if(myOrders.length > 0) {
+         w.classList.remove('hidden');
+         document.getElementById('homeWidgetStatus').innerText = myOrders.length > 1 ? `${myOrders.length} ออเดอร์` : (myOrders[0].status === 'Pending' ? 'รอดำเนินการ' : (myOrders[0].status === 'Ready' ? 'อาหารเสร็จแล้ว' : 'กำลังปรุง'));
+      } else { w.classList.add('hidden'); }
+
+      const list = getProcessedShops(keyword);
+      const container = document.getElementById('homeShopList');
+      if(list.length === 0) {
+        container.innerHTML = `<div class="text-center py-6 text-sm text-slate-400">ไม่พบร้านค้าในเงื่อนไข</div>`;
+      } else {
+        let html = createShopHTML(list[0], true);
+        if(list.length > 1) {
+          html += `<div class="space-y-2.5 mt-3 pt-2">`;
+          for(let i=1; i<list.length; i++) html += createShopHTML(list[i], false);
+          html += `</div>`;
+        }
+        container.innerHTML = html;
+      }
+      lucide.createIcons();
+    }
+
+    function renderAllStalls() {
+      const list = getProcessedShops('');
+      document.getElementById('stallCount').innerText = list.length;
+      let html = '';
+      list.forEach(shop => { html += createShopHTML(shop, false); });
+      document.getElementById('allStallsList').innerHTML = html;
+      lucide.createIcons();
+    }
+
+    function openShopReviewsAsCustomer(shopId) {
+       renderReviewsPage(shopId);
+       showScreen('screen-view-reviews');
+    }
+
+    function openShopReviewsAsMerchant() {
+       const activeShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+       if(activeShopId) {
+           renderReviewsPage(activeShopId);
+           showScreen('screen-view-reviews');
+       }
+    }
+
+    function renderReviewsPage(shopId) {
+       const shop = getShopsData().find(s => s.id === shopId);
+       if(!shop) return;
+       
+       document.getElementById('vrShopName').innerText = shop.name;
+       document.getElementById('vrAvgRating').innerText = shop.rating.toFixed(1);
+       document.getElementById('vrTotalReviews').innerText = shop.reviewCount || 0;
+
+       let starsHtml = '';
+       const fullStars = Math.floor(shop.rating);
+       for(let i=0; i<5; i++) {
+           if(i < fullStars) starsHtml += `<i data-lucide="star" class="w-5 h-5 fill-current"></i>`;
+           else starsHtml += `<i data-lucide="star" class="w-5 h-5 text-gray-300"></i>`;
+       }
+       document.getElementById('vrStarsVisual').innerHTML = starsHtml;
+
+       const allReviews = getAllReviews().filter(r => r.shopId === shopId).reverse();
+       const container = document.getElementById('vrReviewList');
+
+       if(allReviews.length === 0) {
+           container.innerHTML = `<div class="text-center text-gray-400 py-10 text-sm">ยังไม่มีรีวิวสำหรับร้านนี้</div>`;
+       } else {
+           let rHtml = '';
+           allReviews.forEach(r => {
+               let rStars = '';
+               for(let i=0; i<5; i++) {
+                   if(i < r.stars) rStars += `<i data-lucide="star" class="w-3.5 h-3.5 fill-current"></i>`;
+                   else rStars += `<i data-lucide="star" class="w-3.5 h-3.5 text-gray-200"></i>`;
+               }
+               rHtml += `
+               <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                  <div class="flex justify-between items-start mb-2">
+                     <div class="font-bold text-gray-800 text-sm">${r.userName}</div>
+                     <div class="text-[10px] text-gray-400">${r.date}</div>
+                  </div>
+                  <div class="flex text-amber-400 mb-2">${rStars}</div>
+                  ${r.comment ? `<p class="text-xs text-gray-600">${r.comment}</p>` : `<p class="text-xs text-gray-400 italic">ให้คะแนนโดยไม่มีข้อความ</p>`}
+               </div>`;
+           });
+           container.innerHTML = rHtml;
+       }
+       lucide.createIcons();
+    }
+
+    // Menu Logic
+    function renderTimeSlots(shopId) {
+      let html = '';
+      KinThurLogic.baseSlots.forEach(slot => {
+        const booked = KinThurLogic.getBookedCount(shopId, slot);
+        const max = KinThurLogic.maxQuotaPerSlot;
+        
+        let disabled = booked >= max ? 'disabled' : '';
+        let label = booked >= max ? `${slot} (คิวเต็ม)` : `${slot} (${booked}/${max} คิว)`;
+        html += `<option value="${slot}" ${disabled}>${label}</option>`;
+      });
+      document.getElementById('pickupTime').innerHTML = html;
+    }
+
+    function openShop(id) {
+      currentShopId = id;
+      cart = {}; 
+      document.getElementById('menuMainContent').innerHTML = ''; 
+      showScreen('screen-menu'); 
+    }
+
+    function renderMenuPageContent() {
+      const shop = getShopsData().find(s => s.id === currentShopId);
+      if(!shop) return;
+
+      let menusHtml = '';
+      shop.menus.forEach(m => {
+        if(m.status === 'out') {
+          menusHtml += `
+            <article class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 opacity-70">
+              <div class="flex space-x-3">
+                <img class="w-16 h-16 rounded-xl object-cover shrink-0 grayscale" src="${m.img}"/>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start justify-between"><h4 class="font-bold text-[13.5px] text-slate-700 truncate">${m.name}</h4><span class="bg-[#d9777f] text-white text-[10px] font-medium px-2 py-0.5 rounded-md ml-1 shrink-0">หมดชั่วคราว</span></div>
+                  <div class="text-slate-400 font-bold text-sm mt-1">฿${m.price}</div>
+                </div>
+              </div>
+            </article>`;
+        } else {
+          menusHtml += `
+            <article class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 flex flex-col justify-between">
+              <div class="flex space-x-3">
+                <img class="w-16 h-16 rounded-xl object-cover shrink-0" src="${m.img}"/>
+                <div class="flex-1 min-w-0">
+                  <h4 class="font-bold text-[13.5px] text-slate-800 truncate">${m.name}</h4>
+                  <div class="text-[#f95f24] font-bold text-sm mt-1">฿${m.price}</div>
+                </div>
+              </div>
+              <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                <span class="text-[11px] text-slate-400">จำนวนจาน</span>
+                <div class="flex items-center space-x-3 bg-[#f3f6fa] rounded-full px-2 py-0.5">
+                  <button class="w-6 h-6 rounded-full bg-white shadow-sm flex items-center justify-center font-bold text-slate-600 active:scale-90 transition" onclick="updateCart('${m.id}', -1, ${m.price}, '${m.name}')">-</button>
+                  <span class="font-bold text-xs text-slate-800 w-[16px] text-center" id="qty_${m.id}">0</span>
+                  <button class="w-6 h-6 rounded-full bg-[#f95f24] text-white flex items-center justify-center font-bold active:scale-90 transition" onclick="updateCart('${m.id}', 1, ${m.price}, '${m.name}')">+</button>
+                </div>
+              </div>
+            </article>`;
+        }
+      });
+
+      let quickNotesHtml = '';
+      if(shop.quickNotes && shop.quickNotes.length > 0) {
+         shop.quickNotes.forEach(note => {
+             quickNotesHtml += `<button class="bg-[#f0f4fa] hover:bg-[#e4ebf5] text-[#556987] text-[11px] font-medium px-2.5 py-1 rounded-full active:scale-95 transition" type="button" onclick="addNote('${note}')">+ ${note}</button>`;
+         });
+      }
+
+      const fullHtml = `
+          <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 relative">
+            <div class="flex justify-between items-start">
+              <div class="space-y-1 pr-2">
+                <span class="inline-block bg-[#eef3f9] text-[#556987] font-semibold text-[11px] px-2.5 py-0.5 rounded-full" id="menuShopBooth">บูธ ${shop.booth} • โรงอาหารกลาง</span>
+                <h2 class="text-base font-bold text-slate-800 leading-tight" id="menuShopName">${shop.name}</h2>
+              </div>
+              <div class="w-10 h-10 rounded-full bg-[#fdeee4] overflow-hidden shrink-0 border border-slate-100"><img id="menuShopImg" src="${shop.img}" class="w-full h-full object-cover" /></div>
+            </div>
+            <div class="mt-3 bg-[#e8fbf3] border border-[#a7eed0] rounded-xl px-3 py-2 flex items-center space-x-2">
+              <span class="text-[#0dbf7d] text-base font-bold">⚡</span>
+              <p class="text-[12px] font-medium text-[#0f8c5b]">รับที่ช่อง Kin-Thur Fast Lane เท่านั้น</p>
+            </div>
+          </section>
+
+          <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-1.5">
+              <div class="flex items-center space-x-1.5"><i data-lucide="clock" class="w-4 h-4 text-orange-600"></i><h3 class="font-bold text-slate-800 text-[14px]">เลือกรอบรับอาหาร</h3></div>
+              <span class="bg-[#dcfce7] text-[#15803d] text-[10.5px] font-bold px-2 py-0.5 rounded">ตรงเวลา 100%</span>
+            </div>
+            <div class="relative mt-3">
+              <select id="pickupTime" class="w-full bg-[#fffcfb] border border-[#d6a48d] rounded-xl py-2.5 pl-3 pr-10 text-[13px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#f95f24] outline-none">
+                <!-- Injected after render -->
+              </select>
+              <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400"><i data-lucide="chevron-down" class="w-4 h-4"></i></div>
+            </div>
+          </section>
+
+          <section class="space-y-3">
+            <div class="flex items-center justify-between px-1 pt-1">
+              <h3 class="font-bold text-slate-800 text-[15px]">รายการอาหาร</h3>
+              <span class="text-[11px] bg-[#ebf0f7] text-[#4b6382] font-semibold px-2 py-0.5 rounded-full">พร้อมเสิร์ฟด่วน</span>
+            </div>
+            <div id="menuListContainer" class="space-y-3">${menusHtml}</div>
+          </section>
+
+          <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-2.5">
+            <div class="flex items-center space-x-1.5"><span class="text-orange-500 text-base">✏️</span><h3 class="font-bold text-slate-800 text-[14px]">ความต้องการเพิ่มเติม</h3></div>
+            <input class="w-full bg-[#f4f7fb] border border-slate-200 text-[12px] rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-[#f95f24] outline-none" placeholder="พิมพ์รายละเอียด หรือเลือกจากด้านล่าง" type="text" id="specialNote"/>
+            <div class="flex flex-wrap gap-1.5 pt-1" id="quickNotesContainer">${quickNotesHtml}</div>
+          </section>
+      `;
+
+      document.getElementById('menuMainContent').innerHTML = fullHtml;
+      renderTimeSlots(shop.id);
+      updateCartUI();
+      lucide.createIcons();
+    }
+
+    function addNote(noteText) {
+      const input = document.getElementById('specialNote');
+      if (input.value) input.value += `, ${noteText}`;
+      else input.value = noteText;
+    }
+
+    function updateCart(mId, change, price, name) {
+      if(!cart[mId]) cart[mId] = { qty: 0, price: price, name: name };
+      let newQty = cart[mId].qty + change;
+      if (newQty < 0) newQty = 0;
+      cart[mId].qty = newQty;
+      if(newQty === 0) delete cart[mId];
+      document.getElementById(`qty_${mId}`).innerText = newQty;
+      updateCartUI();
+    }
+
+    function updateCartUI() {
+      let totalQty = 0; let totalPrice = 0;
+      for (const [id, item] of Object.entries(cart)) { totalQty += item.qty; totalPrice += (item.qty * item.price); }
+      document.getElementById('menuItemCount').innerText = `รวม ${totalQty} รายการ`;
+      document.getElementById('menuTotalPrice').innerText = `฿${totalPrice}`;
+      const btn = document.getElementById('checkoutBtn');
+      if(totalQty > 0) {
+        btn.disabled = false;
+        document.getElementById('menuCheckoutBtnText').innerText = `ยืนยันออเดอร์ • ฿${totalPrice}`;
+      } else {
+        btn.disabled = true;
+        document.getElementById('menuCheckoutBtnText').innerText = `เลือกอาหารเพื่อสั่ง`;
+      }
+    }
+
+    function goToCheckout() {
+      const shop = getShopsData().find(s => s.id === currentShopId);
+      const timeSlot = document.getElementById('pickupTime').value;
+      
+      const booked = KinThurLogic.getBookedCount(shop.id, timeSlot);
+      if(booked >= KinThurLogic.maxQuotaPerSlot) {
+         showToast(`ขออภัย รอบเวลา ${timeSlot} คิวเต็มแล้ว กรุณาเลือกรอบอื่น`, "error");
+         renderTimeSlots(shop.id); 
+         return;
+      }
+
+      document.getElementById('chkBooth').innerText = shop.booth;
+      document.getElementById('chkShopName').innerText = shop.name;
+      document.getElementById('chkQrShop').innerText = shop.name;
+      document.getElementById('chkAccName').innerText = shop.name;
+      document.getElementById('chkPickupTime').innerText = timeSlot;
+      
+      let html = ''; let total = 0;
+      for (const [id, item] of Object.entries(cart)) {
+        html += `<div class="flex items-center justify-between text-slate-700">
+            <div class="flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-2 shrink-0"></span><span>${item.qty}x ${item.name}</span></div>
+            <span class="font-medium text-slate-900 ml-2">฿${item.qty * item.price}.00</span>
+          </div>`;
+        total += (item.qty * item.price);
+      }
+      document.getElementById('chkOrderItems').innerHTML = html;
+      document.getElementById('chkTotalPrice').innerText = `฿${total}.00`;
+      document.getElementById('chkQrPrice').innerText = `฿${total}.00`;
+      document.getElementById('chkBtnPrice').innerText = `ยืนยันการชำระเงิน • ฿${total}.00`;
+      
+      document.getElementById('confirmPaymentBtn').classList.add('opacity-50', 'pointer-events-none');
+      document.getElementById('uploadSlipBtn').classList.remove('bg-emerald-50', 'border-emerald-300');
+      document.getElementById('uploadSlipBtn').classList.add('bg-orange-50/40');
+      document.getElementById('uploadSlipBtn').style.borderColor = '#fbd5b5';
+      document.getElementById('uploadIcon').innerHTML = `<i data-lucide="upload" class="w-6 h-6"></i>`;
+      document.getElementById('uploadIcon').classList.replace('text-emerald-600','text-orange-600');
+      document.getElementById('uploadIcon').classList.replace('bg-emerald-100','bg-orange-100/90');
+      document.getElementById('uploadText').innerText = 'แตะเพื่อจำลองการแนบสลิป';
+      document.getElementById('uploadText').classList.replace('text-emerald-800','text-slate-800');
+
+      showScreen('screen-checkout');
+      
+      const expireTime = Date.now() + (5 * 60 * 1000);
+      localStorage.setItem('kt_checkoutExpire', expireTime);
+      startCheckoutTimer(); 
+      lucide.createIcons();
+    }
+
+    function cancelCheckout(isExpired = false) {
+       clearInterval(checkoutInterval);
+       localStorage.removeItem('kt_checkoutExpire');
+       
+       if(isExpired) {
+         cart = {};
+         showToast("หมดเวลาชำระเงิน ระบบได้ยกเลิกออเดอร์แล้ว", "error");
+         showScreen('screen-home');
+       } else {
+         showScreen('screen-menu');
+       }
+    }
+
+    function startCheckoutTimer() {
+       clearInterval(checkoutInterval);
+       const display = document.getElementById('checkoutTimerDisplay');
+       
+       checkoutInterval = setInterval(() => {
+          const expireTime = localStorage.getItem('kt_checkoutExpire');
+          if(!expireTime) { clearInterval(checkoutInterval); return; }
+          
+          let secondsLeft = Math.floor((parseInt(expireTime) - Date.now()) / 1000);
+          
+          if (secondsLeft <= 0) {
+             cancelCheckout(true);
+          } else {
+             let m = Math.floor(secondsLeft / 60);
+             let s = secondsLeft % 60;
+             if(display) display.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+          }
+       }, 1000);
+    }
+
+    function copyPromptPay() {
+      navigator.clipboard.writeText('089-xxx-4567').then(() => {
+         showToast("คัดลอกเบอร์พร้อมเพย์แล้ว", "success", false);
+      });
+    }
+
+    function downloadQR() {
+      showToast("บันทึกรูป QR Code สำเร็จ", "success", false);
+    }
+
+    function simulateUpload() {
+      const btn = document.getElementById('uploadSlipBtn');
+      btn.classList.replace('bg-orange-50/40', 'bg-emerald-50');
+      btn.style.borderColor = '#86efac';
+      
+      document.getElementById('uploadIcon').innerHTML = `<i data-lucide="check" class="w-6 h-6"></i>`;
+      document.getElementById('uploadIcon').classList.replace('text-orange-600','text-emerald-600');
+      document.getElementById('uploadIcon').classList.replace('bg-orange-100/90','bg-emerald-100');
+      
+      document.getElementById('uploadText').innerText = 'ตรวจสอบสลิปสำเร็จ';
+      document.getElementById('uploadText').classList.replace('text-slate-800','text-emerald-800');
+
+      document.getElementById('confirmPaymentBtn').classList.remove('opacity-50', 'pointer-events-none');
+      lucide.createIcons();
+    }
+
+    function confirmPayment() {
+      clearInterval(checkoutInterval); 
+      localStorage.removeItem('kt_checkoutExpire');
+      const shop = getShopsData().find(s => s.id === currentShopId);
+      const timeSlot = document.getElementById('pickupTime').value;
+      
+      const booked = KinThurLogic.getBookedCount(shop.id, timeSlot);
+      if(booked >= KinThurLogic.maxQuotaPerSlot) {
+         showToast(`ขออภัย รอบเวลา ${timeSlot} มีผู้จองเต็มแล้วระหว่างที่คุณชำระเงิน กรุณาเลือกรอบอื่น`, "error");
+         showScreen('screen-menu');
+         renderTimeSlots(shop.id);
+         return;
+      }
+
+      vibrateDevice(200); 
+
+      let total = 0; let itemsStr = ''; let rawItems = [];
+      for (const [id, item] of Object.entries(cart)) {
+        total += (item.qty * item.price);
+        itemsStr += `<div class="flex justify-between items-center text-slate-700">
+            <div class="flex items-center space-x-2"><span class="text-slate-400 font-mono text-[11px]">${item.qty}x</span><span class="font-normal truncate max-w-[200px]">${item.name}</span></div>
+            <span class="font-medium text-slate-800 font-mono">฿${item.qty * item.price}.00</span>
+          </div>`;
+        rawItems.push(item);
+      }
+      
+      const noteInput = document.getElementById('specialNote');
+      const specialNote = noteInput ? noteInput.value : '';
+
+      let lastOrderNo = parseInt(localStorage.getItem('kt_lastOrderNo') || '84');
+      lastOrderNo++;
+      localStorage.setItem('kt_lastOrderNo', lastOrderNo);
+      const orderIdStr = 'KT-' + String(lastOrderNo).padStart(3, '0');
+      
+      const newOrder = {
+        id: orderIdStr,
+        userName: currentSessionUser || localStorage.getItem('kt_currentUserName') || 'ลูกค้า',
+        shopId: shop.id, shopName: shop.name, booth: shop.booth, img: shop.img, prepMins: shop.prepMins || 5,
+        status: 'Pending', 
+        total: total, time: timeSlot,
+        specialNote: specialNote,
+        itemsHtml: itemsStr, rawItems: rawItems, timeLimitMs: 0
+      };
+
+      let allOrders = getAllOrders();
+      allOrders.push(newOrder);
+      saveAllOrders(allOrders);
+
+      cart = {}; 
+      if(noteInput) noteInput.value = ''; 
+      showToast("ชำระเงินสำเร็จ! ออเดอร์ถูกส่งไปยังร้านค้าแล้ว", "success");
+      showScreen('screen-queue');
+    }
+
+    // Customer Actions
+    function cancelOrder(orderId) {
+       if(!confirm("คุณต้องการยกเลิกออเดอร์นี้ใช่หรือไม่? (เงินจะถูกคืนเข้า Wallet ใน 24 ชม.)")) return;
+       let allOrders = getAllOrders();
+       let o = allOrders.find(x => x.id === orderId);
+       if(o && o.status === 'Pending') {
+           o.status = 'Cancelled';
+           saveAllOrders(allOrders);
+           showToast("ยกเลิกออเดอร์สำเร็จ", "info", false);
+           renderActiveQueue();
+           renderHistory();
+       } else {
+           showToast("ไม่สามารถยกเลิกได้ ร้านค้าเริ่มปรุงอาหารแล้ว", "error", false);
+       }
+    }
+
+    function openReviewModal(shopId, shopName) {
+       document.getElementById('reviewTargetShopId').value = shopId;
+       document.getElementById('reviewShopNameText').innerText = shopName;
+       document.getElementById('reviewCommentText').value = '';
+       setReviewRating(0); 
+       document.getElementById('reviewModal').classList.remove('hidden');
+    }
+
+    function closeReviewModal(force = false) {
+       document.getElementById('reviewModal').classList.add('hidden');
+    }
+
+    function setReviewRating(stars) {
+       document.getElementById('reviewCurrentStars').value = stars;
+       const container = document.getElementById('starRatingContainer');
+       // เปลี่ยนจากการหาแท็ก 'i' เป็น 'svg' เพราะ Lucide แปลง <i> เป็น <svg> ไปแล้ว
+       const icons = container.querySelectorAll('svg');
+       icons.forEach((icon, index) => {
+           if(index < stars) {
+               icon.classList.remove('text-gray-300');
+               icon.classList.add('text-yellow-400', 'fill-current');
+           } else {
+               icon.classList.remove('text-yellow-400', 'fill-current');
+               icon.classList.add('text-gray-300');
+           }
+       });
+       document.getElementById('submitReviewBtn').disabled = stars === 0;
+    }
+
+    function submitReview() {
+       const shopId = document.getElementById('reviewTargetShopId').value;
+       const stars = parseInt(document.getElementById('reviewCurrentStars').value);
+       const comment = document.getElementById('reviewCommentText').value.trim();
+       
+       if(shopId && stars > 0) {
+           const shops = getShopsData();
+           const shopIndex = shops.findIndex(s => s.id === shopId);
+           if(shopIndex > -1) {
+               
+               let currentRating = shops[shopIndex].rating || 5;
+               let currentCount = shops[shopIndex].reviewCount || 0;
+               let newRating = ((currentRating * currentCount) + stars) / (currentCount + 1);
+               
+               shops[shopIndex].rating = parseFloat(newRating.toFixed(1));
+               shops[shopIndex].reviewCount = currentCount + 1;
+               saveShopsData(shops);
+
+               // Save Review to DB
+               const allReviews = getAllReviews();
+               const userName = "ลูกค้าไม่ประสงค์ออกนาม"; // Anonymous by default as requested
+               allReviews.push({
+                   shopId: shopId,
+                   userName: userName,
+                   stars: stars,
+                   comment: comment,
+                   date: new Date().toLocaleDateString('th-TH')
+               });
+               saveAllReviews(allReviews);
+               
+               showToast(`ขอบคุณสำหรับรีวิว ${stars} ดาว!`, "success", false);
+               closeReviewModal();
+               renderHistory(); 
+           }
+       }
+    }
+
+    // --- 6. BACKGROUND SYNC & REAL-TIME NOTIFICATIONS ---
+    let myLastKnownOrdersState = ""; 
+    let merchantLastKnownOrdersState = "";
+
+    function startBackgroundSync() {
+       clearInterval(syncInterval);
+       
+       if(currentUserRole === 'customer') {
+           const initialOrders = getMyActiveOrders();
+           myLastKnownOrdersState = initialOrders.map(o => o.id + o.status).join('|');
+       } else {
+           const initialOrders = getActiveOrdersForMerchant();
+           merchantLastKnownOrdersState = initialOrders.map(o => o.id + o.status).join('|');
+       }
+
+       syncInterval = setInterval(() => {
+          if(currentUserRole === 'customer') {
+             renderNotifications();
+
+             const myOrders = getMyActiveOrders();
+             const currentState = myOrders.map(o => o.id + o.status).join('|');
+             
+             if(currentState !== myLastKnownOrdersState) {
+                 myOrders.forEach(o => {
+                    const oldOrder = myLastKnownOrdersState.includes(o.id + "Pending");
+                    if(oldOrder && o.status === 'Cooking') {
+                        showToast(`ร้านกำลังปรุงออเดอร์ ${o.id} ของคุณ!`, "warning", true);
+                    }
+                    const oldCooking = myLastKnownOrdersState.includes(o.id + "Cooking");
+                    if((oldOrder || oldCooking) && o.status === 'Ready') {
+                        showToast(`อาหารของคุณเสร็จแล้ว! มารับได้เลย`, "success", true);
+                    }
+                 });
+                 myLastKnownOrdersState = currentState;
+                 if(document.getElementById('screen-queue').classList.contains('active')) renderActiveQueue();
+             }
+
+             if(document.getElementById('screen-home').classList.contains('active')) {
+                const w = document.getElementById('homeActiveQueueWidget');
+                if(w) {
+                  if(myOrders.length > 0) {
+                     w.classList.remove('hidden');
+                     document.getElementById('homeWidgetStatus').innerText = myOrders.length > 1 ? `${myOrders.length} ออเดอร์` : (myOrders[0].status === 'Pending' ? 'รอดำเนินการ' : (myOrders[0].status === 'Ready' ? 'อาหารเสร็จแล้ว' : 'กำลังปรุง'));
+                     const navBadge = document.getElementById('navBadge');
+                     if(navBadge) navBadge.classList.remove('hidden');
+                  } else { 
+                     w.classList.add('hidden'); 
+                     const navBadge = document.getElementById('navBadge');
+                     if(navBadge) navBadge.classList.add('hidden');
+                  }
+                }
+             }
+             if(document.getElementById('screen-menu').classList.contains('active')) {
+                 const keyword = document.querySelector('input[placeholder="ค้นหาร้านอาหารหรือเมนู..."]')?.value || '';
+                 if(!keyword && currentShopId) renderTimeSlots(currentShopId);
+             }
+          } else { // Merchant
+             const activeOrds = getActiveOrdersForMerchant();
+             const currentState = activeOrds.map(o => o.id + o.status).join('|');
+             
+             if(currentState !== merchantLastKnownOrdersState) {
+                 activeOrds.forEach(o => {
+                     if(o.status === 'Pending' && !merchantLastKnownOrdersState.includes(o.id)) {
+                         showToast(`มีออเดอร์ใหม่เข้า! คุณ${o.userName} (${o.id})`, "new-order", true);
+                     }
+                 });
+                 merchantLastKnownOrdersState = currentState;
+                 if(document.getElementById('screen-merchant-kds').classList.contains('active')) renderKDS();
+             }
+          }
+       }, 1000);
+
+       clearInterval(queueTimerInterval);
+       queueTimerInterval = setInterval(() => {
+          if(currentUserRole === 'customer') {
+             const myOrders = getMyActiveOrders();
+             myOrders.forEach(myOrder => {
+                 if(myOrder.status === 'Cooking') {
+                    const t = document.getElementById(`queueTimerText_${myOrder.id}`);
+                    if(t) {
+                       const diff = Math.max(0, Math.floor((myOrder.timeLimitMs - Date.now()) / 1000));
+                       t.innerText = `${Math.floor(diff / 60).toString().padStart(2, '0')}:${(diff % 60).toString().padStart(2, '0')}`;
+                    }
+                 }
+             });
+          }
+       }, 1000);
+    }
+
+    let lastQueueState = null;
+    function renderActiveQueue() {
+      const myOrders = getMyActiveOrders();
+      const container = document.getElementById('queueTicketContainer');
+      
+      if(myOrders.length === 0) {
+        if(lastQueueState !== 'Empty') {
+          container.innerHTML = `<div class="text-center text-slate-400 py-10 mt-10"><i data-lucide="check-circle-2" class="w-12 h-12 mx-auto mb-2 text-emerald-400"></i>ไม่มีออเดอร์ในขณะนี้</div>`;
+          lastQueueState = 'Empty'; lucide.createIcons();
+        } return;
+      }
+
+      const currentState = myOrders.map(o => o.id + o.status).join('|');
+      if(lastQueueState !== currentState) {
+         let fullHtml = '';
+
+         myOrders.forEach((myOrder, index) => {
+             let statusBanner = ''; let timerHtml = '';
+             let cancelBtnHtml = '';
+
+             if (myOrder.status === 'Pending') {
+                statusBanner = `<div class="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 flex items-center text-blue-800 text-xs font-bold"><i data-lucide="loader" class="w-4 h-4 animate-spin mr-2"></i> รอดำเนินการ (รอร้านรับออเดอร์)...</div>`;
+                timerHtml = `<div class="text-center text-gray-400 text-xs py-2">เวลาจะเริ่มเดินเมื่อร้านกดเริ่มปรุง</div>`;
+                cancelBtnHtml = `<button class="mt-3 w-full bg-white border border-red-200 text-red-500 py-2.5 rounded-xl text-xs font-bold hover:bg-red-50 transition" onclick="cancelOrder('${myOrder.id}')">ยกเลิกออเดอร์</button>`;
+             } else if (myOrder.status === 'Cooking') {
+                statusBanner = `<div class="bg-[#f0fdf4] border border-[#dcfce7] rounded-xl px-3 py-2.5 flex items-center justify-between"><div class="flex items-center space-x-2"><span class="flex h-2.5 w-2.5 relative"><span class="animate-ping absolute h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative rounded-full h-2.5 w-2.5 bg-emerald-500"></span></span><div><p class="text-xs font-bold text-emerald-900">กำลังปรุงอย่างพิถีพิถัน</p></div></div><div class="bg-[#00703c] text-white text-[11px] px-2.5 py-1 rounded-lg">กำลังปรุง</div></div>`;
+                timerHtml = `<div class="flex items-center justify-between"><div class="flex items-center space-x-3"><div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center"><i data-lucide="hourglass" class="w-5 h-5 text-amber-700 animate-pulse"></i></div><div><p class="text-[11px] text-slate-500">เวลาประมาณการปรุง</p><p class="text-xs font-semibold text-slate-800">รับประมาณ ${myOrder.time}</p></div></div><div class="text-2xl font-black text-[#0d7377] font-mono" id="queueTimerText_${myOrder.id}">00:00</div></div>`;
+             } else if (myOrder.status === 'Ready') {
+                statusBanner = `<div class="bg-emerald-100 border border-emerald-300 rounded-xl px-3 py-3 flex items-center justify-between animate-bounce"><div class="flex items-center space-x-2"><i data-lucide="bell-ring" class="w-5 h-5 text-emerald-600"></i><div><p class="text-sm font-bold text-emerald-900">อาหารเสร็จแล้ว!</p></div></div><div class="bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm">รับอาหารที่ร้าน</div></div>`;
+                timerHtml = `<div class="text-center text-emerald-600 font-bold text-sm py-2">กรุณาแสดงหน้าจอนี้เพื่อรับอาหาร 🏃‍♂️</div>`;
+             }
+
+             let customerNoteHtml = '';
+             if(myOrder.specialNote && myOrder.specialNote.trim() !== '') {
+                customerNoteHtml = `<div class="mt-2 text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100"><span class="font-bold text-slate-600">📝 หมายเหตุ:</span> ${myOrder.specialNote}</div>`;
+             }
+
+             const divider = index > 0 ? '<div class="w-full h-2 border-b-2 border-dashed border-gray-300 my-6"></div>' : '';
+
+             fullHtml += `
+               ${divider}
+               <div class="space-y-4">
+                 <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 relative">
+                   <div class="flex items-start justify-between mb-3.5"><div class="flex items-center space-x-3"><div class="w-12 h-12 rounded-xl overflow-hidden shadow-inner bg-amber-50 shrink-0"><img class="w-full h-full object-cover" src="${myOrder.img}"/></div><div><div class="flex items-center space-x-1 text-[#e14817] font-semibold text-[11px]"><i data-lucide="zap" class="w-3 h-3 fill-current"></i><span>ชำระเงินด่วน (Fast Lane)</span></div><h2 class="text-sm font-bold text-slate-800 leading-snug">${myOrder.shopName}</h2><p class="text-[11px] text-slate-500 flex items-center mt-0.5"><i data-lucide="store" class="w-3 h-3 mr-1"></i> บูธ ${myOrder.booth} • โรงอาหารกลาง</p></div></div></div>
+                   <div class="relative bg-gradient-to-br from-[#f25c27] via-[#f16327] to-[#ee4b1f] text-white rounded-2xl p-4 text-center shadow-md overflow-hidden">
+                     <div class="ticket-cutout-left shadow-inner"></div><div class="ticket-cutout-right shadow-inner"></div>
+                     <p class="text-xs font-normal text-orange-100 mb-1">หมายเลขคิวรับอาหาร</p><div class="text-5xl font-black my-1 font-sans">${myOrder.id.split('-').pop()}</div><div class="inline-block mt-1 bg-black/15 px-3 py-0.5 rounded-full text-xs font-mono"># ${myOrder.id}</div>
+                   </div>
+                   <div class="border-b border-dashed border-slate-200 my-3.5"></div>
+                   ${statusBanner}
+                 </div>
+                 <div class="bg-[#ebf3fc] border border-blue-100 rounded-2xl p-3.5 shadow-sm">${timerHtml}</div>
+                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 text-center"><div class="inline-block p-3.5 bg-white rounded-2xl border-2 border-slate-100 shadow-md relative"><i data-lucide="qr-code" class="w-28 h-28 text-slate-900"></i></div><h3 class="text-sm font-bold text-slate-800 mt-3 mb-1">สแกนรับอาหาร</h3></div>
+                 <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                   <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3"><div class="flex items-center space-x-1.5 text-xs font-bold text-slate-800"><i data-lucide="receipt" class="w-4 h-4 text-orange-500"></i><span>สรุปรายการ</span></div><span class="inline-flex items-center text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200"><i data-lucide="check-circle" class="w-3 h-3 mr-1 text-emerald-600"></i>ชำระเงินแล้ว</span></div>
+                   <div class="space-y-2.5 text-xs">${myOrder.itemsHtml}</div>
+                   ${customerNoteHtml}
+                   <div class="mt-3.5 pt-2.5 border-t border-slate-100 flex justify-between items-center bg-slate-50/70 -mx-4 -mb-4 p-4 rounded-b-2xl"><span class="text-xs font-medium text-slate-600">ยอดรวมทั้งสิ้น</span><span class="text-base font-bold text-[#c2410c] font-mono">฿${myOrder.total}.00</span></div>
+                 </div>
+                 ${cancelBtnHtml}
+               </div>
+             `;
+         });
+
+         container.innerHTML = fullHtml;
+         lastQueueState = currentState; 
+         lucide.createIcons();
+      }
+
+      myOrders.forEach(myOrder => {
+         if (myOrder.status === 'Cooking') {
+             const t = document.getElementById(`queueTimerText_${myOrder.id}`);
+             if(t) {
+                const diff = Math.max(0, Math.floor((myOrder.timeLimitMs - Date.now()) / 1000));
+                t.innerText = `${Math.floor(diff / 60).toString().padStart(2, '0')}:${(diff % 60).toString().padStart(2, '0')}`;
+             }
+         }
+      });
+    }
+
+    function renderHistory() {
+      const uName = currentSessionUser || localStorage.getItem('kt_currentUserName') || 'ลูกค้า';
+      const allOrders = getAllOrders();
+      const myOrders = allOrders.filter(o => o.userName === uName);
+      
+      const container = document.getElementById('historyListContainer');
+      let html = '';
+      
+      const activeOrds = myOrders.filter(o => o.status !== 'Completed' && o.status !== 'Cancelled');
+      activeOrds.forEach(myOrder => {
+        html += `
+        <article class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-3">
+          <div class="flex justify-between items-center mb-2"><span class="inline-block bg-[#ffefe3] text-[#d6550f] text-[11px] font-semibold px-2 py-0.5 rounded-md">${myOrder.id}</span><span class="text-gray-400 text-[11px]">วันนี้, ล่าสุด</span></div>
+          <h2 class="text-sm font-bold text-gray-800">${myOrder.shopName}</h2><p class="text-gray-500 text-xs mt-0.5">รวม ฿${myOrder.total}</p>
+          <div class="border-t border-gray-100 my-2.5"></div>
+          <div class="flex justify-between items-center mb-3.5"><div class="flex items-center space-x-1.5 text-[#1b9b65]"><i data-lucide="${myOrder.status==='Ready'?'check-circle-2':'loader'}" class="w-4 h-4 ${myOrder.status==='Pending'||myOrder.status==='Cooking'?'animate-spin':''}"></i><span class="text-xs font-semibold">${myOrder.status==='Ready'?'มารับอาหารได้เลย!':'กำลังดำเนินการ'}</span></div></div>
+          <button class="w-full bg-[#f26315] hover:bg-[#de560e] text-white py-2 rounded-xl text-xs font-medium active:scale-95 transition" onclick="showScreen('screen-queue')">ดูตั๋วปัจจุบัน</button>
+        </article>`;
+      });
+
+      const doneOrds = myOrders.filter(o => o.status === 'Completed' || o.status === 'Cancelled').reverse();
+      doneOrds.forEach(myOrder => {
+        const isCancel = myOrder.status === 'Cancelled';
+        const stText = isCancel ? 'ยกเลิกแล้ว (คืนเงิน)' : 'รับอาหารเรียบร้อยแล้ว';
+        const stColor = isCancel ? 'text-red-500' : 'text-[#1b9b65]';
+        const icon = isCancel ? 'x-circle' : 'check-circle-2';
+        
+        html += `
+        <article class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 opacity-80 mb-3">
+          <div class="flex justify-between items-center mb-2"><span class="inline-block bg-gray-100 text-gray-600 text-[11px] font-semibold px-2 py-0.5 rounded-md">${myOrder.id}</span><span class="text-gray-400 text-[11px]">${isCancel?'ถูกยกเลิก':'สำเร็จ'}</span></div>
+          <h2 class="text-sm font-bold text-gray-800">${myOrder.shopName}</h2><p class="text-gray-500 text-xs mt-0.5">รวม ฿${myOrder.total}</p>
+          <div class="border-t border-gray-100 my-2.5"></div>
+          <div class="flex justify-between items-center mb-2"><div class="flex items-center space-x-1.5 ${stColor}"><i data-lucide="${icon}" class="w-4 h-4"></i><span class="text-xs font-semibold">${stText}</span></div><div class="text-[#0c1a30] text-sm font-bold ${isCancel?'line-through text-gray-400':''}">฿${myOrder.total}.00</div></div>
+          ${!isCancel ? `<button class="w-full bg-white border border-gray-200 text-gray-700 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition" onclick="openReviewModal('${myOrder.shopId}', '${myOrder.shopName}')">⭐ รีวิวร้านค้านี้</button>` : ''}
+        </article>
+        `;
+      });
+
+      if(html === '') html = `<div class="text-center py-6 text-sm text-slate-400">ยังไม่มีประวัติการสั่งซื้อ</div>`;
+      container.innerHTML = html; lucide.createIcons();
+    }
+
+    // Merchant Shop Pause Logic
+    function toggleShopPauseStatus(checkbox) {
+       const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+       const shops = getShopsData();
+       const shop = shops.find(s => s.id === activeMerchantShopId);
+       if(shop) {
+           shop.isPaused = checkbox.checked;
+           saveShopsData(shops);
+           updateShopPauseUI(shop.isPaused);
+           if(shop.isPaused) showToast("ระงับการรับออเดอร์ชั่วคราวแล้ว", "warning", false);
+           else showToast("เปิดรับออเดอร์ตามปกติ", "success", false);
+       }
+    }
+    
+    function updateShopPauseUI(isPaused) {
+       const banner = document.getElementById('shopPausedBanner');
+       if(isPaused) banner.classList.remove('hidden');
+       else banner.classList.add('hidden');
+    }
+
+    // --- 7. MERCHANT KDS LOGIC (With Drag & Drop) ---
+    let lastKdsState = null;
+    function renderKDS() {
+      const activeOrds = getActiveOrdersForMerchant();
+      const list = document.getElementById('merchantOrderList');
+      
+      let pendingCount = 0; let cookingCount = 0; let readyCount = 0;
+      activeOrds.forEach(o => {
+        if(o.status === 'Pending') pendingCount++;
+        if(o.status === 'Cooking') cookingCount++;
+        if(o.status === 'Ready') readyCount++;
+      });
+      
+      const pendingEl = document.getElementById('kdsPendingCount');
+      if(pendingEl) pendingEl.innerText = pendingCount;
+      const cookingEl = document.getElementById('kdsCookingCount');
+      if(cookingEl) cookingEl.innerText = cookingCount;
+
+      if(activeOrds.length === 0) {
+        if(lastKdsState !== 'Empty') {
+           list.innerHTML = `<div class="text-center text-gray-400 py-10 mt-10">ยังไม่มีออเดอร์เข้า...</div>`;
+           lastKdsState = 'Empty';
+        } return;
+      }
+
+      const currentState = activeOrds.map(o => o.id + o.status).join('|');
+      if (lastKdsState !== currentState) {
+          let html = '';
+          activeOrds.forEach((o, index) => {
+             let btnHtml = ''; let statusTag = '';
+
+             if(o.status === 'Pending') {
+                statusTag = `<span class="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full shadow-sm border border-blue-200">โอนแล้ว (รอรับ)</span>`;
+                btnHtml = `<button class="w-full bg-[#FF5722] text-white font-bold text-xs rounded-xl py-3 shadow-sm active:scale-95 transition" onclick="kdsStartCooking('${o.id}')">👨‍🍳 กดรับออเดอร์ & เริ่มปรุง</button>`;
+             } else if(o.status === 'Cooking') {
+                statusTag = `<span class="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full border border-amber-200 animate-pulse">กำลังปรุง</span>`;
+                btnHtml = `<button class="w-full bg-emerald-500 text-white font-bold text-xs rounded-xl py-3 shadow-sm active:scale-95 transition" onclick="kdsMarkReady('${o.id}')">🔔 อาหารเสร็จแล้ว (เรียกคิว)</button>`;
+             } else if(o.status === 'Ready') {
+                statusTag = `<span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full border border-emerald-200">เสร็จแล้ว</span>`;
+                btnHtml = `<button class="w-full bg-gray-200 text-gray-600 font-bold text-xs rounded-xl py-3 active:scale-95 transition" onclick="kdsCompleteOrder('${o.id}')">✅ ลูกค้ารับอาหารแล้ว (ปิดจ็อบ)</button>`;
+             }
+
+             let orderItems = '';
+             if(o.rawItems) {
+                o.rawItems.forEach(item => { orderItems += `<div class="flex justify-between text-xs py-1.5 font-medium border-b border-gray-100 last:border-0"><span>${item.name}</span><span class="text-[#FF5722] font-bold">x ${item.qty}</span></div>`; });
+             }
+
+             let noteHtml = '';
+             if(o.specialNote && o.specialNote.trim() !== '') {
+                noteHtml = `<div class="mt-2 mb-1 text-[11px] text-red-600 bg-red-50 p-2 rounded border border-red-100 font-medium"><span class="font-bold">📝 หมายเหตุ:</span> ${o.specialNote}</div>`;
+             }
+
+             // Added draggable attributes
+             html += `
+              <article class="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 mb-3 kds-card cursor-grab active:cursor-grabbing transition-transform" draggable="true" ondragstart="handleDragStart(event, '${o.id}', ${index})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, ${index})" ondragend="handleDragEnd(event)">
+                <div class="flex justify-between items-start mb-3 pointer-events-none">
+                   <div class="flex items-center space-x-3"><div class="w-12 h-12 rounded-xl bg-[#FF5722] text-white flex flex-col items-center justify-center shadow-sm"><span class="text-sm font-bold">${o.id.split('-').pop()}</span><span class="text-[8px] font-light">Fast-Lane</span></div><div><h3 class="font-bold text-[13px] text-gray-900">คุณ${o.userName}</h3><div class="text-[11px] text-gray-500 mt-0.5">รับเวลา: ${o.time}</div></div></div>
+                   ${statusTag}
+                </div>
+                <div class="bg-gray-50 px-3 py-2 rounded-lg mb-4 border border-gray-100 pointer-events-none">
+                   ${orderItems}
+                   ${noteHtml}
+                </div>
+                <div class="pointer-events-auto">${btnHtml}</div>
+              </article>
+             `;
+          });
+          list.innerHTML = html;
+          lastKdsState = currentState;
+      }
+    }
+
+    // Drag and Drop implementation for KDS
+    let draggedOrderId = null;
+    let draggedOriginalIndex = null;
+
+    function handleDragStart(e, id, index) {
+        draggedOrderId = id;
+        draggedOriginalIndex = index;
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.classList.add('dragging');
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault(); // Necessary to allow dropping
+        e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDrop(e, targetIndex) {
+        e.preventDefault();
+        e.target.closest('.kds-card').classList.remove('dragging');
+        if(draggedOriginalIndex === targetIndex) return;
+
+        let allOrders = getAllOrders();
+        const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+        
+        // Find indices in the MAIN array (not just the filtered active array)
+        let activeIndicesInMain = [];
+        allOrders.forEach((o, i) => {
+            if(o.shopId === activeMerchantShopId && o.status !== 'Completed' && o.status !== 'Cancelled') {
+                activeIndicesInMain.push({mainIdx: i, orderId: o.id});
+            }
+        });
+
+        const fromMainIdx = activeIndicesInMain[draggedOriginalIndex].mainIdx;
+        const toMainIdx = activeIndicesInMain[targetIndex].mainIdx;
+
+        // Swap in main array
+        const temp = allOrders[fromMainIdx];
+        allOrders.splice(fromMainIdx, 1);
+        allOrders.splice(toMainIdx, 0, temp);
+
+        saveAllOrders(allOrders);
+        lastKdsState = null; // force re-render
+        renderKDS();
+        vibrateDevice(50);
+    }
+
+    function handleDragEnd(e) {
+        e.target.classList.remove('dragging');
+        draggedOrderId = null;
+        draggedOriginalIndex = null;
+    }
+
+    function kdsStartCooking(orderId) { 
+      vibrateDevice(50);
+      let allOrders = getAllOrders();
+      let o = allOrders.find(x => x.id === orderId);
+      if(o){ 
+          o.status = 'Cooking'; 
+          o.timeLimitMs = Date.now() + ((o.prepMins||5) * 60 * 1000); 
+          saveAllOrders(allOrders); 
+          addNotification(o.userName, "ออเดอร์กำลังปรุง", `ร้านกำลังเตรียมออเดอร์ #${o.id.split('-').pop()} ของคุณ`, "Cooking");
+          renderKDS(); 
+      } 
+    }
+    
+    function kdsMarkReady(orderId) { 
+      vibrateDevice([50, 50, 50]);
+      let allOrders = getAllOrders();
+      let o = allOrders.find(x => x.id === orderId);
+      if(o){ 
+          o.status = 'Ready'; 
+          saveAllOrders(allOrders); 
+          addNotification(o.userName, "อาหารเสร็จแล้ว!", `ออเดอร์ #${o.id.split('-').pop()} พร้อมรับที่ร้านแล้ว`, "Ready");
+          renderKDS(); 
+          showToast("เรียกคิวลูกค้าสำเร็จ", "success", false); 
+      } 
+    }
+    
+    function kdsCompleteOrder(orderId) { 
+      vibrateDevice(50);
+      let allOrders = getAllOrders();
+      let o = allOrders.find(x => x.id === orderId);
+      if(o){ 
+         o.status = 'Completed'; 
+         saveAllOrders(allOrders); 
+         lastKdsState = null; renderKDS(); renderDashboard(); showToast("ส่งมอบอาหารเรียบร้อย ปิดจ็อบ!", "success", false);
+      } 
+    }
+
+    // --- 8. MERCHANT INVENTORY (CRUD) ---
+    function renderMerchantInventory() {
+       const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+       const shops = getShopsData();
+       const shop = shops.find(s => s.id === activeMerchantShopId);
+       if(!shop) return;
+       
+       let html = '';
+       shop.menus.forEach(m => {
+         const isOut = m.status === 'out';
+         html += `
+          <article class="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-sm ${isOut ? 'opacity-70' : ''}" id="mItem_${m.id}">
+            <div class="flex gap-2.5">
+              <img src="${m.img}" class="w-14 h-14 rounded-xl object-cover shrink-0 ${isOut ? 'grayscale' : ''}" id="mImg_${m.id}"/>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-start justify-between">
+                  <h3 class="font-bold text-[12px] text-slate-800 leading-tight">${m.name}</h3>
+                  <div class="flex gap-1">
+                     <button onclick="openMenuModal('${m.id}')" class="w-6 h-6 rounded-md bg-[#f1f5f9] text-slate-600 flex justify-center items-center active:scale-90 transition"><i data-lucide="edit-2" class="w-3 h-3"></i></button>
+                     <button onclick="deleteMenu('${m.id}')" class="w-6 h-6 rounded-md bg-red-50 text-red-500 flex justify-center items-center active:scale-90 transition"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                  </div>
+                </div>
+                <div class="mt-1"><span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${isOut ? 'bg-[#fee2e2] text-[#dc2626]' : 'bg-[#fed7aa] text-[#c2410c]'} " id="mBadge_${m.id}">${isOut ? 'หมดชั่วคราว' : 'ขายปกติ'}</span></div>
+                <p class="text-xs font-bold text-[#b43a05] mt-1">฿${m.price}</p>
+              </div>
+            </div>
+            <div class="mt-2.5 ${isOut ? 'bg-gray-100' : 'bg-[#f0f4f9]'} rounded-xl px-2.5 py-1.5 flex items-center justify-between" id="mBox_${m.id}">
+              <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${isOut ? 'bg-red-500' : 'bg-[#1da05c]'}" id="mDot_${m.id}"></span><span class="text-[11px] font-medium text-slate-700" id="mText_${m.id}">${isOut ? 'ปิดการขาย' : 'พร้อมขาย (เปิด)'}</span></div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" ${isOut ? '' : 'checked'} class="sr-only peer toggle-checkbox" onchange="toggleMenuStatus('${shop.id}', '${m.id}', this)"/>
+                <div class="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:bg-[#0d6842] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+              </label>
+            </div>
+          </article>`;
+       });
+       document.getElementById('merchantMenuList').innerHTML = html;
+       lucide.createIcons();
+    }
+
+    function toggleMenuStatus(shopId, menuId, checkbox) {
+       const shops = getShopsData();
+       const shop = shops.find(s => s.id === shopId);
+       const menu = shop.menus.find(m => m.id === menuId);
+       menu.status = checkbox.checked ? 'available' : 'out';
+       saveShopsData(shops);
+       renderMerchantInventory();
+    }
+
+    function openMenuModal(menuId = '') {
+        const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+        const shops = getShopsData();
+        const shop = shops.find(s => s.id === activeMerchantShopId);
+        if(!shop) return;
+        
+        document.getElementById('formMenuId').value = menuId;
+        if(menuId) {
+            const menu = shop.menus.find(m => m.id === menuId);
+            document.getElementById('menuModalTitle').innerText = 'แก้ไขเมนู';
+            document.getElementById('formMenuName').value = menu.name;
+            document.getElementById('formMenuDesc').value = menu.desc || '';
+            document.getElementById('formMenuPrice').value = menu.price;
+            document.getElementById('formMenuImg').value = menu.img;
+        } else {
+            document.getElementById('menuModalTitle').innerText = 'เพิ่มเมนูใหม่';
+            document.getElementById('formMenuName').value = '';
+            document.getElementById('formMenuDesc').value = '';
+            document.getElementById('formMenuPrice').value = '';
+            document.getElementById('formMenuImg').value = '';
+        }
+        document.getElementById('menuFormModal').classList.remove('hidden');
+    }
+
+    function closeMenuModal() {
+        document.getElementById('menuFormModal').classList.add('hidden');
+    }
+
+    function saveMenuData() {
+        const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+        const shops = getShopsData();
+        const shop = shops.find(s => s.id === activeMerchantShopId);
+        if(!shop) return;
+
+        const mId = document.getElementById('formMenuId').value;
+        const mName = document.getElementById('formMenuName').value;
+        const mDesc = document.getElementById('formMenuDesc').value;
+        const mPrice = parseInt(document.getElementById('formMenuPrice').value);
+        const mImg = document.getElementById('formMenuImg').value || 'https://lh3.googleusercontent.com/aida-public/AB6AXuAgvFIlaLkIbwvoXgPpyOJSzC8PUfn-AWL2pUQ1XcM18aeMa1zRxdYWl0B3mo9-j4ek2BXsbmImtm3gGKeBpJOlbE5qYm1PtBqTsfr9_OIG5zxLQijWWZMtXzfLWhvK3OLcNuhj5yAP3vIA2Bx7UOezeEfAZCw6ITe0S3lNfF-MErz1gLSbBTLZAugu_bne2-qeOD98aNDmamkYcHE2wLgfciLXcBdlP07umO9cR5K7kaDEJxdLIXhi';
+
+        if(mId) {
+            const idx = shop.menus.findIndex(m => m.id === mId);
+            if(idx > -1) {
+                shop.menus[idx].name = mName;
+                shop.menus[idx].desc = mDesc;
+                shop.menus[idx].price = mPrice;
+                shop.menus[idx].img = mImg;
+            }
+            showToast("อัปเดตเมนูสำเร็จ", "success", false);
+        } else {
+            const newId = 'm1_' + Date.now();
+            shop.menus.push({
+                id: newId, name: mName, desc: mDesc, price: mPrice, img: mImg, status: 'available'
+            });
+            showToast("เพิ่มเมนูใหม่สำเร็จ", "success", false);
+        }
+        saveShopsData(shops);
+        closeMenuModal();
+        renderMerchantInventory();
+    }
+
+    function deleteMenu(menuId) {
+        if(!confirm('คุณต้องการลบเมนูนี้ใช่หรือไม่?')) return;
+        const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+        const shops = getShopsData();
+        const shop = shops.find(s => s.id === activeMerchantShopId);
+        
+        shop.menus = shop.menus.filter(m => m.id !== menuId);
+        saveShopsData(shops);
+        showToast("ลบเมนูสำเร็จ", "info", false);
+        renderMerchantInventory();
+    }
+
+    // --- 9. MERCHANT DASHBOARD ---
+    function renderDashboard() {
+      const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+      const completedOrders = getAllOrders().filter(o => o.status === 'Completed' && o.shopId === activeMerchantShopId);
+      const sCount = completedOrders.length;
+      const sTotal = completedOrders.reduce((sum, o) => sum + o.total, 0);
+      
+      document.getElementById('dashSalesTotal').innerText = `฿${sTotal}`;
+      document.getElementById('dashSalesCount').innerText = sCount;
+
+      // Advanced: Best Sellers Logic
+      let itemCounts = {};
+      completedOrders.forEach(o => {
+          if(o.rawItems) {
+              o.rawItems.forEach(item => {
+                  if(!itemCounts[item.name]) itemCounts[item.name] = 0;
+                  itemCounts[item.name] += item.qty;
+              });
+          }
+      });
+      let sortedItems = Object.keys(itemCounts).map(k => ({name: k, qty: itemCounts[k]})).sort((a,b) => b.qty - a.qty);
+      
+      const bestSellersDiv = document.getElementById('dashBestSellers');
+      if(sortedItems.length === 0) {
+          bestSellersDiv.innerHTML = `<div class="text-center text-gray-400 py-2">ยังไม่มีข้อมูล</div>`;
+      } else {
+          let html = '';
+          const maxQty = sortedItems[0].qty;
+          sortedItems.slice(0,3).forEach((item, idx) => {
+              const p = Math.max(10, (item.qty / maxQty) * 100);
+              html += `
+                <div class="flex flex-col gap-1 mb-2.5">
+                   <div class="flex justify-between"><span class="truncate pr-2">${idx+1}. ${item.name}</span><span class="font-bold text-orange-600">${item.qty} จาน</span></div>
+                   <div class="w-full bg-gray-100 rounded-full h-1.5"><div class="bg-orange-400 h-1.5 rounded-full" style="width: ${p}%"></div></div>
+                </div>
+              `;
+          });
+          bestSellersDiv.innerHTML = html;
+      }
+
+      // Advanced: Peak Hours Chart (Simulated distribution based on completed count)
+      const chartDiv = document.getElementById('dashPeakChart');
+      if(sCount === 0) {
+         chartDiv.innerHTML = `<div class="w-full text-center text-gray-400 text-xs self-center">ยังไม่มีข้อมูลเพียงพอ</div>`;
+      } else {
+         // Fake distribution for visual
+         const h11 = Math.floor(sCount * 0.2);
+         const h12 = Math.floor(sCount * 0.5);
+         const h13 = sCount - h11 - h12;
+         const maxH = Math.max(h11, h12, h13, 1);
+         const p11 = (h11/maxH)*100; const p12 = (h12/maxH)*100; const p13 = (h13/maxH)*100;
+         
+         chartDiv.innerHTML = `
+            <div class="flex flex-col items-center justify-end h-full w-1/3 group">
+               <div class="text-[10px] text-gray-400 mb-1 opacity-0 group-hover:opacity-100 transition">${h11}</div>
+               <div class="w-full bg-blue-100 rounded-t-md relative transition-all duration-500" style="height: ${Math.max(10, p11)}%"></div>
+               <div class="text-[10px] text-gray-600 mt-1">11:00</div>
+            </div>
+            <div class="flex flex-col items-center justify-end h-full w-1/3 group">
+               <div class="text-[10px] font-bold text-blue-600 mb-1">${h12}</div>
+               <div class="w-full bg-blue-500 rounded-t-md relative transition-all duration-500 shadow-sm" style="height: ${Math.max(10, p12)}%"></div>
+               <div class="text-[10px] font-bold text-gray-800 mt-1">12:00</div>
+            </div>
+            <div class="flex flex-col items-center justify-end h-full w-1/3 group">
+               <div class="text-[10px] text-gray-400 mb-1 opacity-0 group-hover:opacity-100 transition">${h13}</div>
+               <div class="w-full bg-blue-100 rounded-t-md relative transition-all duration-500" style="height: ${Math.max(10, p13)}%"></div>
+               <div class="text-[10px] text-gray-600 mt-1">13:00</div>
+            </div>
+         `;
+      }
+
+      const recentContainer = document.getElementById('dashRecentOrders');
+      if (sCount === 0) {
+        recentContainer.innerHTML = `<div class="text-center text-gray-400 py-4 text-xs">ยังไม่มียอดขายในวันนี้</div>`;
+      } else {
+        let html = '';
+        completedOrders.slice().reverse().slice(0,5).forEach(o => { // Show last 5
+            html += `
+              <div class="flex justify-between items-center text-xs border-b border-gray-50 pb-3 mb-3 last:border-0 last:mb-0 last:pb-0">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="check" class="w-4 h-4"></i></div>
+                  <div><p class="font-bold text-gray-800">ออเดอร์สำเร็จ #${o.id.split('-').pop()}</p><p class="text-[10px] text-gray-500">คุณ${o.userName}</p></div>
+                </div>
+                <div class="text-emerald-600 font-bold">+ ฿${o.total}</div>
+              </div>
+            `;
+        });
+        recentContainer.innerHTML = html;
+      }
+      lucide.createIcons();
+    }
+
+    function clearDashboardData() {
+        if(!confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างข้อมูลยอดขายและประวัติออเดอร์ทั้งหมดเพื่อเริ่มวันใหม่?')) return;
+        
+        const activeMerchantShopId = currentSessionShopId || localStorage.getItem('kt_activeMerchantShopId');
+        let allOrders = getAllOrders();
+        
+        allOrders = allOrders.filter(o => !(o.status === 'Completed' && o.shopId === activeMerchantShopId));
+        saveAllOrders(allOrders);
+        
+        renderDashboard();
+        showToast('ล้างข้อมูลยอดขายเรียบร้อย เริ่มวันใหม่!', 'success', false);
+        
+        showScreen('screen-merchant-dashboard');
+    }
+  </script>
+</body>
+</html>
